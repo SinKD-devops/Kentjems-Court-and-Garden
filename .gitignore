@@ -1,0 +1,44 @@
+# ── secrets — never commit ────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── dependencies ──────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── next.js ───────────────────────────────────────────────
+.next/
+out/
+build/
+dist/
+next-env.d.ts
+
+# ── supabase ──────────────────────────────────────────────
+supabase/.temp/
+supabase/.branches/
+
+# ── testing / coverage ────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ── vercel ────────────────────────────────────────────────
+.vercel
+
+# ── logs ──────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── editors / os ──────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
