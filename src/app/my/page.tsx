@@ -141,9 +141,16 @@ function Row(booking: BookingRow) {
       {booking.status === "requested" && (
         <>
           <p className="text-[12px] leading-relaxed text-soft">
-            Pay at Kentjems Store to confirm. This does not hold the slot — whoever pays
+            Pay at Kentjems Store, or pay online below. Paying at the store does not hold
+            the slot — whoever pays
             first gets it.
           </p>
+          <Link
+            href={`/pay/${booking.id}`}
+            className="rounded-full bg-green px-4 py-2.5 text-center text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
+          >
+            Pay online now
+          </Link>
           <form action={withdrawRequest}>
             <input type="hidden" name="id" value={booking.id} />
             <button
