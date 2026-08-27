@@ -11,13 +11,16 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
   const params = await searchParams;
   const spaceSlug = typeof params.space === "string" ? params.space : "court";
   const start = typeof params.start === "string" ? params.start : "";
+  const hours = Math.min(12, Math.max(1, Number(params.hours ?? 1) || 1));
 
   const startsAt = new Date(start);
   if (!start || Number.isNaN(startsAt.getTime())) redirect("/");
 
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/sign-in?next=${encodeURIComponent(`/book?space=${spaceSlug}&start=${start}`)}`);
+    redirect(
+      `/sign-in?next=${encodeURIComponent(`/book?space=${spaceSlug}&start=${start}&hours=${hours}`)}`,
+    );
   }
 
   const dateKey = new Intl.DateTimeFormat("en-CA", {
@@ -28,11 +31,15 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
   }).format(startsAt);
 
   const availability = await getDayAvailability(spaceSlug, dateKey);
-  const slot = availability.bands
-    .flatMap((b) => b.slots)
-    .find((s) => new Date(s.startsAt).getTime() === startsAt.getTime());
+  const all = availability.bands.flatMap((b) => b.slots);
+  const first = all.findIndex((s) => new Date(s.startsAt).getTime() === startsAt.getTime());
 
-  if (!slot) redirect(`/?space=${spaceSlug}&date=${dateKey}`);
+  if (first === -1) redirect(`/?space=${spaceSlug}&date=${dateKey}`);
+
+  const chosen = all.slice(first, first + hours);
+  const endsAt = new Date(startsAt.getTime() + hours * 3_600_000);
+  const total = chosen.reduce((sum, s) => sum + (s.priceCentavos ?? 0), 0);
+  const contested = Math.max(...chosen.map((s) => s.waiting), 0);
 
   const supabase = createReadClient();
   const [{ data: settings }, { data: profile }] = await Promise.all([
@@ -40,7 +47,11 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
     supabase.from("profiles").select("accepted_terms_at").eq("id", user!.id).single(),
   ]);
 
-  const unavailable = slot.state === "booked" || slot.state === "pending_review";
+  // Any hour in the range being gone kills the whole booking — it is one
+  // continuous session, not a set of independent hours.
+  const unavailable =
+    chosen.length !== hours ||
+    chosen.some((s) => s.state === "booked" || s.state === "pending_review");
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
@@ -51,7 +62,7 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
         >
           ← Back
         </Link>
-        <p className="mt-1 text-[15px] font-bold tracking-tight">Confirm your slot</p>
+        <p className="mt-1 text-[15px] font-bold tracking-tight">Confirm your booking</p>
       </header>
 
       <main className="flex flex-1 flex-col gap-3 px-4 pb-6 pt-4">
@@ -59,21 +70,25 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
           <p className="text-[11px] font-semibold text-soft">
             {availability.space.name} · {formatLongDate(dateKey)}
           </p>
-          <div className="mt-1 flex items-baseline justify-between">
+          <div className="mt-1 flex items-baseline justify-between gap-3">
             <p className="text-[17px] font-bold tabular-nums">
-              {formatTime(slot.startsAt)} – {formatTime(slot.endsAt)}
+              {formatTime(startsAt)} – {formatTime(endsAt)}
             </p>
             <p className="text-[19px] font-bold tabular-nums text-green-deep">
-              {slot.priceCentavos === null ? "—" : formatPeso(slot.priceCentavos)}
+              {formatPeso(total)}
             </p>
           </div>
+          <p className="mt-0.5 text-[11.5px] font-medium text-soft">
+            {hours} hour{hours === 1 ? "" : "s"}
+            {hasMixedRates(chosen) && " · day and evening rates"}
+          </p>
         </section>
 
         {unavailable ? (
           <div className="rounded-2xl border border-line bg-surface px-4 py-4 text-center">
-            <p className="text-[14px] font-bold">That slot has gone</p>
+            <p className="text-[14px] font-bold">Those hours have gone</p>
             <p className="mt-1 text-[13px] text-soft">
-              Someone paid for it while you were deciding. Pick another time.
+              Someone paid for part of that time while you were deciding. Pick again.
             </p>
             <Link
               href={`/?space=${spaceSlug}&date=${dateKey}`}
@@ -87,9 +102,10 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
             <WarningPanel />
             <ConfirmForm
               space={spaceSlug}
-              startsAt={slot.startsAt}
+              startsAt={startsAt.toISOString()}
+              hours={hours}
               needsTerms={!profile?.accepted_terms_at}
-              contested={slot.waiting}
+              contested={contested}
             />
           </>
         )}
@@ -102,13 +118,17 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
   );
 }
 
+function hasMixedRates(slots: { priceCentavos: number | null }[]) {
+  return new Set(slots.map((s) => s.priceCentavos)).size > 1;
+}
+
 function WarningPanel() {
   return (
     <section className="rounded-2xl border border-[#F0DDBC] bg-[var(--amber-bg)] px-4 py-3.5">
-      <p className="text-[13px] font-bold text-amber">This does not reserve the slot</p>
+      <p className="text-[13px] font-bold text-amber">This does not reserve the time</p>
       <p className="mt-1 text-[12.5px] leading-relaxed text-[#7A5410]">
-        Whoever pays first gets it. Go to Kentjems Store now, or pay by GCash from your
-        bookings page. Your request expires in 30 minutes.
+        Whoever pays first gets it. Go to Kentjems Store now — your request expires in 30
+        minutes.
       </p>
     </section>
   );

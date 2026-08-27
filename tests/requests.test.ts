@@ -178,6 +178,79 @@ describe.skipIf(!DATABASE_URL)("request_booking", () => {
   });
 });
 
+describe.skipIf(!DATABASE_URL)("multi-hour bookings", () => {
+  const book = (hours: number, startHour: number) =>
+    asUser<{ request_booking: string }>(
+      userId,
+      "select request_booking('court', $1::timestamptz, true, $2)",
+      [slotIn(1, startHour), hours],
+    );
+
+  const priceOf = async (id: string) => {
+    const { rows } = await db.query(
+      `select price_centavos, extract(epoch from (ends_at - starts_at)) / 3600 as hours
+       from bookings where id = $1`,
+      [id],
+    );
+    return { price: rows[0].price_centavos, hours: Number(rows[0].hours) };
+  };
+
+  it("charges three daytime hours at PHP 180", async () => {
+    const rows = await book(3, 9);
+    expect(await priceOf(rows[0].request_booking)).toEqual({ price: 18000, hours: 3 });
+  });
+
+  it("sums across the evening boundary rather than charging the start rate", async () => {
+    // 5-8 PM is one daytime hour and two evening hours: 60 + 100 + 100.
+    // Charging three hours at the 5 PM rate would sell the evening for 180.
+    const rows = await book(3, 17);
+    expect(await priceOf(rows[0].request_booking)).toEqual({ price: 26000, hours: 3 });
+  });
+
+  it("refuses a range that would run past midnight", async () => {
+    // 11 PM plus two hours ends at 1 AM. The old check compared clock times,
+    // where 01:00 is not later than 24:00, so this was accepted.
+    await expect(book(2, 23)).rejects.toThrow(/closed at that time/i);
+  });
+
+  it("allows a range ending exactly at midnight", async () => {
+    await expect(book(2, 22)).resolves.toBeTruthy();
+  });
+
+  it("refuses a range starting before opening", async () => {
+    await expect(book(2, 5)).rejects.toThrow(/closed at that time/i);
+  });
+
+  it("rejects nonsense hour counts", async () => {
+    await expect(book(0, 9)).rejects.toThrow(/between 1 and 12 hours/i);
+    await expect(book(20, 9)).rejects.toThrow(/between 1 and 12 hours/i);
+  });
+
+  it("blocks every hour it covers", async () => {
+    await book(3, 9);
+    const { rows } = await db.query(
+      `select count(*)::int as n from public_availability
+       where starts_at < $2::timestamptz and ends_at > $1::timestamptz`,
+      [slotIn(1, 10), slotIn(1, 11)],
+    );
+    // The middle hour of the block is covered even though nothing starts there.
+    expect(rows[0].n).toBe(0); // still only 'requested', so not yet blocking
+
+    await db.query("update bookings set status = 'confirmed' where user_id = $1", [userId]);
+    const { rows: after } = await db.query(
+      `select count(*)::int as n from public_availability
+       where starts_at < $2::timestamptz and ends_at > $1::timestamptz`,
+      [slotIn(1, 10), slotIn(1, 11)],
+    );
+    expect(after[0].n).toBe(1);
+  });
+
+  it("still counts as a single open request", async () => {
+    await book(3, 9);
+    await expect(book(1, 14)).rejects.toThrow(/already have an open request/i);
+  });
+});
+
 describe.skipIf(!DATABASE_URL)("withdrawing and expiry", () => {
   it("frees the allowance when a request is withdrawn", async () => {
     const rows = await asUser<{ request_booking: string }>(

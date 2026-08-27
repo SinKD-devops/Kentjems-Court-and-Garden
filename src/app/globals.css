@@ -172,3 +172,17 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Selected: the one place the accent fills a tile. Raised further than an
+   available slot, because it is the thing about to be acted on. */
+.slot-selected {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 4px 12px rgba(18, 114, 77, 0.32);
+}
+.slot-selected .slot-time {
+  color: #fff;
+}
+.slot-selected .slot-meta {
+  color: rgba(255, 255, 255, 0.82);
+}

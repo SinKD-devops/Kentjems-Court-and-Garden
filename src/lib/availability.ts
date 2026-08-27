@@ -36,6 +36,7 @@ export interface Slot {
   startsAt: string;
   endsAt: string;
   label: string;
+  endLabel: string;
   priceCentavos: number | null;
   state: SlotState;
   waiting: number;
@@ -247,6 +248,7 @@ export async function getDayAvailability(
       startsAt: startsAt.toISOString(),
       endsAt: endsAt.toISOString(),
       label: formatTime(startsAt),
+      endLabel: formatTime(endsAt),
       priceCentavos: rule?.price_centavos ?? null,
       state,
       waiting,

@@ -22,6 +22,7 @@ export async function createRequest(
   const space = String(form.get("space") ?? "");
   const startsAt = String(form.get("startsAt") ?? "");
   const acceptTerms = form.get("terms") === "on";
+  const hours = Math.min(12, Math.max(1, Number(form.get("hours") ?? 1) || 1));
 
   const supabase = await createSupabaseServer();
   const {
@@ -30,7 +31,7 @@ export async function createRequest(
 
   if (!user) {
     redirect(
-      `/sign-in?next=${encodeURIComponent(`/book?space=${space}&start=${startsAt}`)}`,
+      `/sign-in?next=${encodeURIComponent(`/book?space=${space}&start=${startsAt}&hours=${hours}`)}`,
     );
   }
 
@@ -38,6 +39,7 @@ export async function createRequest(
     p_space_slug: space,
     p_starts_at: startsAt,
     p_accept_terms: acceptTerms,
+    p_hours: hours,
   });
 
   if (error) {

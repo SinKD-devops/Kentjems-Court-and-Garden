@@ -8,11 +8,13 @@ const initial: RequestState = {};
 export function ConfirmForm({
   space,
   startsAt,
+  hours,
   needsTerms,
   contested,
 }: {
   space: string;
   startsAt: string;
+  hours: number;
   needsTerms: boolean;
   contested: number;
 }) {
@@ -22,6 +24,7 @@ export function ConfirmForm({
     <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="space" value={space} />
       <input type="hidden" name="startsAt" value={startsAt} />
+      <input type="hidden" name="hours" value={hours} />
 
       {contested > 0 && (
         <p className="rounded-xl bg-tint px-3.5 py-2.5 text-[12.5px] font-semibold text-green-deep">
@@ -59,7 +62,7 @@ export function ConfirmForm({
         disabled={pending}
         className="rounded-full bg-green py-3.5 text-[14.5px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)] disabled:opacity-60"
       >
-        {pending ? "Requesting…" : "Request this slot"}
+        {pending ? "Requesting…" : hours === 1 ? "Request this hour" : `Request these ${hours} hours`}
       </button>
     </form>
   );
