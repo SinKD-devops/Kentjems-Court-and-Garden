@@ -12,6 +12,11 @@ export const dynamic = "force-dynamic";
 
 export default async function BookingPage({ searchParams }: PageProps<"/">) {
   const params = await searchParams;
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+    return <SetupNotice />;
+  }
+
   const spaces = await listSpaces();
 
   const requested = typeof params.space === "string" ? params.space : undefined;
@@ -74,6 +79,34 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
           My bookings
         </Link>
       </footer>
+    </div>
+  );
+}
+
+/**
+ * Shown when the deployment has no Supabase credentials. This is an operator
+ * problem, not a customer one, so it says exactly which variables are missing
+ * and where they go rather than apologising vaguely.
+ */
+function SetupNotice() {
+  return (
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-3 px-5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+        Kentjems Court and Garden
+      </p>
+      <h1 className="text-[20px] font-bold tracking-tight">Not connected to the database</h1>
+      <p className="text-[13.5px] leading-relaxed text-soft">
+        This deployment is missing its Supabase credentials, so availability cannot be
+        loaded. Add these environment variables and redeploy:
+      </p>
+      <ul className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface px-4 py-3.5 font-mono text-[11.5px]">
+        <li>NEXT_PUBLIC_SUPABASE_URL</li>
+        <li>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</li>
+      </ul>
+      <p className="text-[12px] leading-relaxed text-faint">
+        On Vercel: Settings → Environment Variables → Production, then redeploy. Values
+        come from Supabase → Project Settings → API.
+      </p>
     </div>
   );
 }
