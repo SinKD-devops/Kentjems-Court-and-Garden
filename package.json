@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:push": "node scripts/db.mjs push",
-    "db:seed": "node scripts/db.mjs seed"
+    "db:seed": "node scripts/db.mjs seed",
+    "db:secrets": "node scripts/set-secrets.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",

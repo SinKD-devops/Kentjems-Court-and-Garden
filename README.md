@@ -95,3 +95,31 @@ saving since 1978, so slot boundaries use a fixed `+08:00` offset. Timestamps
 are stored UTC and rendered Manila.
 
 **Money is integer centavos.** Never floats.
+
+## SMS hook (Postgres function)
+
+OTP is delivered by `private.send_sms_hook`, a Postgres function that calls
+PhilSMS directly. Supabase's Send SMS hook accepts either an HTTPS endpoint or
+a Postgres function; the function needs no public URL, so it works against a
+localhost dev server and before anything is deployed.
+
+Register it at **Authentication → Hooks → Send SMS → Postgres function**, and
+select `private.send_sms_hook`.
+
+Credentials come from Vault, not from `process.env` — a Postgres function
+cannot read the app's environment:
+
+```bash
+npm run db:secrets   # copies PHILSMS_* from .env.local into Vault
+```
+
+Re-run that after rotating a token.
+
+`http` is used rather than `pg_net` on purpose. pg_net is fire-and-forget, so a
+rejected send would still report success and the customer would watch a phone
+that never buzzes. The synchronous call turns a failure into an error they
+actually see. The call is capped at 8 seconds so a PhilSMS outage cannot pin a
+database connection.
+
+`PHILSMS_SENDER_ID` must be a sender ID approved on your PhilSMS account.
+There is no API to list them — check the PhilSMS dashboard.
