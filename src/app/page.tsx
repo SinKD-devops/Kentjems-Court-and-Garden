@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { DateStrip } from "@/components/DateStrip";
+import { LiveAvailability } from "@/components/LiveAvailability";
 import { SlotGrid } from "@/components/SlotGrid";
 import { SpaceTabs } from "@/components/SpaceTabs";
 import { bookableDates, getDayAvailability, listSpaces } from "@/lib/availability";
@@ -33,6 +35,7 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <LiveAvailability spaceId={availability.space.id} />
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-2.5 pt-3">
         <p className="text-[15px] font-bold tracking-tight">Kentjems Court and Garden</p>
         <p className="text-[11px] font-medium text-soft">{formatLongDate(date)}</p>
@@ -47,21 +50,29 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
         {availability.closedReason ? (
           <ClosedNotice reason={availability.closedReason} />
         ) : availability.space.mode === "hourly" ? (
-          <SlotGrid bands={availability.bands} />
+          <SlotGrid bands={availability.bands} spaceSlug={spaceSlug} />
         ) : (
           <GardenPackages availability={availability} />
         )}
       </main>
 
-      <footer className="glass fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
-        <p className="text-[13px] font-bold">
-          {availability.space.mode === "hourly"
-            ? `${openCount} of ${availability.bands.flatMap((b) => b.slots).length} hours open`
-            : `${availability.packages.length} package${availability.packages.length === 1 ? "" : "s"}`}
-        </p>
-        <p className="text-[11px] font-medium text-soft">
-          Booking opens next — payment at Kentjems Store or GCash
-        </p>
+      <footer className="glass fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-md items-center gap-3 border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-bold">
+            {availability.space.mode === "hourly"
+              ? `${openCount} of ${availability.bands.flatMap((b) => b.slots).length} hours open`
+              : `${availability.packages.length} package${availability.packages.length === 1 ? "" : "s"}`}
+          </p>
+          <p className="text-[11px] font-medium text-soft">
+            Tap an hour to request it — pay at the store
+          </p>
+        </div>
+        <Link
+          href="/my"
+          className="flex-none rounded-full bg-green px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
+        >
+          My bookings
+        </Link>
       </footer>
     </div>
   );

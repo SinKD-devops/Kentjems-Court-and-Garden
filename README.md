@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kentjems Court and Garden
 
-## Getting Started
+Booking app for one outdoor court (hourly) and one garden (event packages),
+in Cebu. Installable to the home screen on Android and iOS.
 
-First, run the development server:
+Full design in [SPEC.md](SPEC.md).
+
+## Running it
 
 ```bash
+cp .env.example .env.local   # fill in the values
+npm install
+npm run db:push              # apply migrations
+npm run db:seed              # spaces, hours, rates, packages, settings
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Command | Does |
+| --- | --- |
+| `npm run dev` | Dev server on :3000 |
+| `npm run build` | Production build |
+| `npm test` | Schema and booking-rule tests (needs `DATABASE_URL`) |
+| `npm run db:push` | Apply pending migrations |
+| `npm run db:seed` | Re-seed reference data (idempotent) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Tests skip rather than fail when `DATABASE_URL` is absent.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Supabase settings that are not in this repo
 
-## Learn More
+Two things live in the Supabase dashboard and have to be set by hand.
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Turn on phone sign-in
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Authentication → Sign In / Providers → Phone** → enable.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Without this, `signInWithOtp` refuses and nobody can sign in.
 
-## Deploy on Vercel
+### 2. Route OTP through PhilSMS
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Supabase's built-in phone auth only speaks to Twilio, MessageBird, Vonage and
+TextLocal. PhilSMS is not among them, so delivery goes through an auth hook
+instead — which is what keeps OTP and booking notifications on one provider,
+one bill, and one deliverability profile.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Authentication → Hooks → Send SMS**
+
+- URI: `https://<your-domain>/api/auth/sms-hook`
+- Copy the generated secret into `SUPABASE_SMS_HOOK_SECRET`
+
+The endpoint lives at [src/app/api/auth/sms-hook/route.ts](src/app/api/auth/sms-hook/route.ts).
+It verifies the Standard Webhooks signature and rejects anything older than
+five minutes, since every accepted call spends SMS credit.
+
+**Supabase cannot reach `localhost`,** so this hook only works once deployed.
+For local development use **Authentication → Sign In / Providers → Phone →
+Test OTP** to register a number and a fixed code. No SMS is sent and no credit
+is spent.
+
+### Before launch
+
+Send yourself an OTP on **both Globe and Smart**. Deliverability varies by
+provider and network, and it matters far more than the per-message price.
+
+## How it fits together
+
+**Availability is derived, never stored** — opening hours minus closures minus
+live bookings, computed per request. Nothing to invalidate when a payment is
+confirmed, and no cached grid can send someone to the store for a slot that
+already sold.
+
+**Double-booking is prevented by Postgres**, not by application code: an
+exclusion constraint on `bookings` makes confirmed and awaiting-review
+bookings mutually exclusive per space, while leaving requests free to overlap.
+Requests are *meant* to overlap — until money changes hands the slot belongs
+to nobody.
+
+**Booking rules live in `request_booking`**, a SECURITY DEFINER function.
+Opening hours, the advance window, the open-request limit, pricing and expiry
+are evaluated in the same transaction as the insert, so there is no gap
+between "is this allowed?" and "do it".
+
+**Expiry is computed, not scheduled.** The `pg_cron` sweep is housekeeping.
+Availability queries treat an expired request as dead, and `request_booking`
+retires the caller's own stale requests before counting — so a late or failed
+sweep can never lock a customer out.
+
+**Live updates ride an availability pulse.** Subscribing to `bookings`
+directly cannot work: RLS hides other customers' rows, and relaxing it would
+expose names and phone numbers, because RLS filters rows and not columns. A
+trigger bumps a per-space counter instead, which is safe for anyone to read,
+and clients refetch through the public views when it moves.
+
+**Times are Asia/Manila throughout.** The Philippines has not observed daylight
+saving since 1978, so slot boundaries use a fixed `+08:00` offset. Timestamps
+are stored UTC and rendered Manila.
+
+**Money is integer centavos.** Never floats.

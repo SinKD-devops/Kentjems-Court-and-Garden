@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { PriceBand, Slot } from "@/lib/availability";
 import { formatPeso } from "@/lib/time";
 
@@ -27,7 +28,7 @@ function meta(slot: Slot): string {
   }
 }
 
-export function SlotGrid({ bands }: { bands: PriceBand[] }) {
+export function SlotGrid({ bands, spaceSlug }: { bands: PriceBand[]; spaceSlug: string }) {
   if (bands.length === 0) return null;
 
   return (
@@ -40,12 +41,32 @@ export function SlotGrid({ bands }: { bands: PriceBand[] }) {
           </h2>
 
           <ul className="grid grid-cols-2 gap-1.5">
-            {band.slots.map((slot) => (
-              <li key={slot.startsAt} className={STATE_CLASS[slot.state]}>
-                <span className="slot-time">{slot.label}</span>
-                <span className="slot-meta">{meta(slot)}</span>
-              </li>
-            ))}
+            {band.slots.map((slot) => {
+              const bookable = slot.state === "available" || slot.state === "contested";
+              const content = (
+                <>
+                  <span className="slot-time">{slot.label}</span>
+                  <span className="slot-meta">{meta(slot)}</span>
+                </>
+              );
+
+              return (
+                <li key={slot.startsAt}>
+                  {bookable ? (
+                    <Link
+                      href={`/book?space=${spaceSlug}&start=${encodeURIComponent(slot.startsAt)}`}
+                      className={`${STATE_CLASS[slot.state]} w-full`}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div className={STATE_CLASS[slot.state]} aria-disabled="true">
+                      {content}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ))}
