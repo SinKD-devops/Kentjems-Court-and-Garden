@@ -84,11 +84,18 @@ describe.skipIf(!DATABASE_URL)("booking overlap guard", () => {
       // than failing immediately — it cannot know the outcome until the
       // first transaction resolves. This is precisely the window in which
       // an application-level "is it free?" check would let both through.
-      const contender = two.query(insertConfirmed, args);
+      //
+      // The rejection is captured rather than awaited, because it stays
+      // pending until the commit below and would otherwise register as an
+      // unhandled rejection in between.
+      const contender = two.query(insertConfirmed, args).then(
+        () => null,
+        (error: unknown) => error,
+      );
 
       await one.query("commit");
 
-      await expect(contender).rejects.toMatchObject({ code: "23P01" });
+      expect(await contender).toMatchObject({ code: "23P01" });
       await two.query("rollback");
 
       const { rows } = await admin.query(

@@ -21,7 +21,7 @@ delete from opening_hours
 where space_id in (select id from spaces where slug in ('court', 'garden'));
 
 insert into opening_hours (space_id, day_of_week, opens_at, closes_at)
-select id, null, '06:00', '24:00' from spaces where slug in ('court', 'garden');
+select id, null::integer, '06:00'::time, '24:00'::time from spaces where slug in ('court', 'garden');
 
 -- ── court pricing ──────────────────────────────────────────────────────
 --   Daytime  06:00–18:00  →  PHP 60   (12 slots: 6am through the 5pm start)
@@ -31,9 +31,9 @@ select id, null, '06:00', '24:00' from spaces where slug in ('court', 'garden');
 delete from pricing_rules where space_id = (select id from spaces where slug = 'court');
 
 insert into pricing_rules (space_id, day_of_week, starts_at_time, ends_at_time, price_centavos, label)
-select id, null, '06:00', '18:00',  6000, 'Daytime' from spaces where slug = 'court'
+select id, null::integer, '06:00'::time, '18:00'::time,  6000, 'Daytime' from spaces where slug = 'court'
 union all
-select id, null, '18:00', '24:00', 10000, 'Evening' from spaces where slug = 'court';
+select id, null::integer, '18:00'::time, '24:00'::time, 10000, 'Evening' from spaces where slug = 'court';
 
 -- ── garden packages ────────────────────────────────────────────────────
 -- The operator adds more of these in admin. This is the first real one.

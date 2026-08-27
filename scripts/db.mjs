@@ -42,6 +42,11 @@ async function push() {
       applied_at timestamptz not null default now()
     )`);
 
+  // This table lives in the public schema, so PostgREST would otherwise
+  // expose it. RLS on with no policies denies anon and authenticated
+  // outright; the migration role bypasses RLS and is unaffected.
+  await client.query("alter table schema_migrations enable row level security");
+
   const files = (await readdir(MIGRATIONS_DIR)).filter((f) => f.endsWith(".sql")).sort();
   const { rows } = await client.query("select version from schema_migrations");
   const applied = new Set(rows.map((r) => r.version));
