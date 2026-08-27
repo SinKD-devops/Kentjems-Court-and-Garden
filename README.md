@@ -98,13 +98,15 @@ are stored UTC and rendered Manila.
 
 ## SMS hook (Postgres function)
 
-OTP is delivered by `private.send_sms_hook`, a Postgres function that calls
+OTP is delivered by `public.send_sms_hook`, a Postgres function that calls
 PhilSMS directly. Supabase's Send SMS hook accepts either an HTTPS endpoint or
 a Postgres function; the function needs no public URL, so it works against a
 localhost dev server and before anything is deployed.
 
 Register it at **Authentication → Hooks → Send SMS → Postgres function**, and
-select `private.send_sms_hook`.
+select `public.send_sms_hook`. It lives in `public` because the dashboard's
+hook picker does not enumerate custom schemas — the grants are the security
+boundary: only `supabase_auth_admin` can execute it.
 
 Credentials come from Vault, not from `process.env` — a Postgres function
 cannot read the app's environment:
