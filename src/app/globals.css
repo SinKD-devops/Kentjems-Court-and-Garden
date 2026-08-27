@@ -1,26 +1,174 @@
 @import "tailwindcss";
 
+/*
+ * Kentjems Court and Garden.
+ *
+ * Green #12724D is deep enough to clear 4.5:1 on white — the brighter mints
+ * do not, and this app is read outdoors in daylight beside the court.
+ *
+ * Glass appears on exactly two surfaces per screen: the top bar and the
+ * bottom action bar. Slot tiles are opaque. Eighteen simultaneously blurred
+ * tiles stutter on a budget Android; one blurred nav bar does not.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #edf2ee;
+  --surface: #ffffff;
+  --sunken: #dfe6e0;
+  --line: #e1e9e3;
+  --ink: #10231a;
+  --soft: #5c7266;
+  --faint: #93a69a;
+  --green: #12724d;
+  --green-deep: #0c5238;
+  --tint: #dcefe3;
+  --tint-line: #b9dfca;
+  --amber: #b0700f;
+  --amber-bg: #fbefd8;
+  --red: #a8403a;
+  --red-bg: #fae4e2;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-line: rgba(16, 35, 26, 0.07);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-faint: var(--faint);
+  --color-green: var(--green);
+  --color-green-deep: var(--green-deep);
+  --color-tint: var(--tint);
+  --color-tint-line: var(--tint-line);
+  --color-amber: var(--amber);
+  --color-red: var(--red);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* System fonts: SF Pro on iPhone, Roboto on Android. Nothing to download,
+     and the installed PWA reads as native on both. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* ── glass bars ──────────────────────────────────────────────────── */
+
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Where backdrop-filter is unsupported, fall back to near-opaque. The layout
+   must never depend on translucency to stay legible. */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: rgba(255, 255, 255, 0.96);
+  }
+}
+
+/* ── slot tiles ──────────────────────────────────────────────────── */
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px 11px 9px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(16, 35, 26, 0.05);
+  text-align: left;
+}
+
+.slot-time {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.slot-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Contested: someone is paying for this right now. */
+.slot-contested {
+  background: var(--tint);
+  border-color: var(--tint-line);
+}
+.slot-contested .slot-meta {
+  color: var(--green-deep);
+}
+
+/* Booked or awaiting review: the tile flattens into the page. Losing the
+   depth is the signal — it no longer looks pressable, because it is not. */
+.slot-booked {
+  background: var(--sunken);
+  border-color: var(--sunken);
+  box-shadow: none;
+}
+.slot-booked .slot-time {
+  color: var(--soft);
+}
+.slot-booked .slot-meta {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+/* Past: no card at all, but it keeps its place so the grid does not jump. */
+.slot-past {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.slot-past .slot-time,
+.slot-past .slot-meta {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+.slot-closed {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--sunken),
+    var(--sunken) 6px,
+    #d7e0d9 6px,
+    #d7e0d9 12px
+  );
+  border-color: var(--sunken);
+  box-shadow: none;
+}
+.slot-closed .slot-time,
+.slot-closed .slot-meta {
+  color: var(--soft);
+}
+
+/* ── focus ───────────────────────────────────────────────────────── */
+
+:where(a, button):focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

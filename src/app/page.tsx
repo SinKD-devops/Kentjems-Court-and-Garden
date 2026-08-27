@@ -1,69 +1,135 @@
-import Image from "next/image";
+import { DateStrip } from "@/components/DateStrip";
+import { SlotGrid } from "@/components/SlotGrid";
+import { SpaceTabs } from "@/components/SpaceTabs";
+import { bookableDates, getDayAvailability, listSpaces } from "@/lib/availability";
+import { formatLongDate, formatPeso, formatTime, todayKey } from "@/lib/time";
 
-export default function Home() {
+// Availability must never be cached. A stale grid sends someone to the store
+// for a slot that sold ten minutes ago.
+export const dynamic = "force-dynamic";
+
+export default async function BookingPage({ searchParams }: PageProps<"/">) {
+  const params = await searchParams;
+  const spaces = await listSpaces();
+
+  const requested = typeof params.space === "string" ? params.space : undefined;
+  const spaceSlug = spaces.some((s) => s.slug === requested)
+    ? (requested as string)
+    : (spaces[0]?.slug ?? "court");
+
+  const today = todayKey();
+  // The space list already carries advanceDays, so the date strip needs no
+  // extra round trip — only the chosen day is fetched.
+  const space = spaces.find((s) => s.slug === spaceSlug)!;
+  const dates = bookableDates(space, today);
+
+  const requestedDate = typeof params.date === "string" ? params.date : undefined;
+  const date = requestedDate && dates.includes(requestedDate) ? requestedDate : today;
+
+  const availability = await getDayAvailability(spaceSlug, date);
+  const openCount = availability.bands
+    .flatMap((b) => b.slots)
+    .filter((s) => s.state === "available" || s.state === "contested").length;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-2.5 pt-3">
+        <p className="text-[15px] font-bold tracking-tight">Kentjems Court and Garden</p>
+        <p className="text-[11px] font-medium text-soft">{formatLongDate(date)}</p>
+        <div className="mt-2.5">
+          <SpaceTabs spaces={spaces} active={spaceSlug} date={date} />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main className="flex flex-1 flex-col gap-4 px-4 pb-24 pt-3">
+        <DateStrip dates={dates} selected={date} spaceSlug={spaceSlug} />
+
+        {availability.closedReason ? (
+          <ClosedNotice reason={availability.closedReason} />
+        ) : availability.space.mode === "hourly" ? (
+          <SlotGrid bands={availability.bands} />
+        ) : (
+          <GardenPackages availability={availability} />
+        )}
       </main>
+
+      <footer className="glass fixed inset-x-0 bottom-0 z-10 mx-auto max-w-md border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
+        <p className="text-[13px] font-bold">
+          {availability.space.mode === "hourly"
+            ? `${openCount} of ${availability.bands.flatMap((b) => b.slots).length} hours open`
+            : `${availability.packages.length} package${availability.packages.length === 1 ? "" : "s"}`}
+        </p>
+        <p className="text-[11px] font-medium text-soft">
+          Booking opens next — payment at Kentjems Store or GCash
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+function ClosedNotice({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-5 text-center">
+      <p className="text-[15px] font-bold">Closed this day</p>
+      <p className="mt-1 text-[13px] text-soft">{reason}</p>
+    </div>
+  );
+}
+
+function GardenPackages({
+  availability,
+}: {
+  availability: Awaited<ReturnType<typeof getDayAvailability>>;
+}) {
+  if (availability.packages.length === 0) {
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-5 text-center">
+        <p className="text-[15px] font-bold">No packages yet</p>
+        <p className="mt-1 text-[13px] text-soft">
+          Garden packages are set up in the operator console. Once added, they appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-2">
+        {availability.packages.map((pkg) => (
+          <li
+            key={pkg.id}
+            className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3 shadow-[0_1px_2px_rgba(16,35,26,0.05)]"
+          >
+            <div>
+              <p className="text-[14px] font-bold">{pkg.name}</p>
+              <p className="text-[11px] font-medium text-soft">
+                {pkg.durationMinutes / 60} hours
+              </p>
+            </div>
+            <p className="text-[16px] font-bold tabular-nums text-green-deep">
+              {formatPeso(pkg.priceCentavos)}
+            </p>
+          </li>
+        ))}
+      </ul>
+
+      {availability.taken.length > 0 && (
+        <div className="rounded-2xl border border-line bg-surface px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+            Already booked this day
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-0.5">
+            {availability.taken.map((t) => (
+              <li key={t.startsAt} className="text-[13px] font-semibold tabular-nums">
+                {formatTime(t.startsAt)} – {formatTime(t.endsAt)}
+                <span className="ml-2 text-[11px] font-medium text-soft">
+                  {t.state === "booked" ? "Booked" : "Being paid"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
