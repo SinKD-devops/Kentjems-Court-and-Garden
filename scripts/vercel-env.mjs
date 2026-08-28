@@ -21,7 +21,23 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 
 const TARGET = process.argv[2] ?? "production";
-const NEVER_SEND = new Set(["DATABASE_URL"]);
+/**
+ * DATABASE_URL is a superuser connection for migrations and tests; the web
+ * app runtime has no business holding it.
+ *
+ * The rest are reserved by Vercel or Node and are rejected on sight. TZ in
+ * particular is dead config here anyway — every timezone in this app is an
+ * explicit Asia/Manila or a fixed +08:00 offset, because relying on a process
+ * timezone is how slots end up on the wrong date when a server moves region.
+ */
+const NEVER_SEND = new Set([
+  "DATABASE_URL",
+  "TZ",
+  "PATH",
+  "NODE_ENV",
+  "PORT",
+  "HOME",
+]);
 
 function run(args, input) {
   return new Promise((resolve) => {
@@ -50,6 +66,7 @@ if (raw === null) {
 }
 
 const vars = [];
+const skipped = [];
 for (const line of raw.split(/\r?\n/)) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("#")) continue;
@@ -58,7 +75,15 @@ for (const line of raw.split(/\r?\n/)) {
 
   const name = trimmed.slice(0, eq).trim();
   const value = trimmed.slice(eq + 1).trim();
-  if (!value || NEVER_SEND.has(name)) continue;
+  if (!value) continue;
+
+  // Vercel rejects reserved names outright, which stops the whole push. Skip
+  // them here so one leftover line cannot fail the deploy.
+  if (NEVER_SEND.has(name) || name.startsWith("VERCEL_") || name.startsWith("AWS_")) {
+    skipped.push(name);
+    continue;
+  }
+
   vars.push([name, value]);
 }
 
@@ -80,7 +105,9 @@ if (siteUrl.includes("localhost")) {
 }
 
 console.log(`\nSending ${vars.length} variables to Vercel (${TARGET}).`);
-console.log("DATABASE_URL is skipped on purpose.\n");
+if (skipped.length > 0) {
+  console.log(`Skipped on purpose: ${skipped.join(", ")}\n`);
+}
 
 let failures = 0;
 
