@@ -43,7 +43,12 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
       <LiveAvailability spaceId={availability.space.id} />
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-2.5 pt-3">
         <p className="text-[15px] font-bold tracking-tight">Kentjems Court and Garden</p>
-        <p className="text-[11px] font-medium text-soft">{formatLongDate(date)}</p>
+        <p className="text-[11px] font-medium text-soft">
+          {formatLongDate(date)}
+          {availability.rainOutlook && (
+            <RainOutlook outlook={availability.rainOutlook} />
+          )}
+        </p>
         <div className="mt-2.5">
           <SpaceTabs spaces={spaces} active={spaceSlug} date={date} />
         </div>
@@ -175,5 +180,25 @@ function GardenPackages({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The day's rain outlook, always shown when a forecast loaded.
+ *
+ * Without this the feature is invisible on a dry day, and "no warning" is
+ * indistinguishable from "broken". Butuan peaking at 39% — one point under the
+ * per-slot threshold — is exactly the case that made this necessary.
+ */
+function RainOutlook({ outlook }: { outlook: { peak: number; atLabel: string } }) {
+  const wet = outlook.peak >= 40;
+
+  return (
+    <span className={wet ? "text-amber" : "text-soft"}>
+      {" · "}
+      {wet
+        ? `☂ up to ${outlook.peak}% rain around ${outlook.atLabel}`
+        : `☀ dry, ${outlook.peak}% rain at most`}
+    </span>
   );
 }

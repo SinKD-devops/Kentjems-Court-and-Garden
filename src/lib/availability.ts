@@ -73,6 +73,9 @@ export interface DayAvailability {
   /** Ranges already taken that day — what the garden shows instead of a grid. */
   taken: { startsAt: string; endsAt: string; state: SlotState }[];
   closedReason: string | null;
+  /** Always present when a forecast loaded, so "no warning" is legible as
+      "checked, and it is fine" rather than a broken feature. */
+  rainOutlook: { peak: number; atLabel: string } | null;
 }
 
 interface PricingRule {
@@ -222,6 +225,7 @@ export async function getDayAvailability(
     packages: packageList,
     taken,
     closedReason: wholeDayClosure?.reason ?? null,
+    rainOutlook: null,
   };
 
   if (space.mode !== "hourly" || wholeDayClosure) {
@@ -282,7 +286,20 @@ export async function getDayAvailability(
       });
   }
 
-  return { ...base, bands: [...bands.values()] };
+  const allSlots = [...bands.values()].flatMap((band) => band.slots);
+
+  // Peak rain across BOOKABLE hours only. Taking it from the calendar day
+  // reported 61% at midnight — an hour the court is shut, and useless to
+  // somebody deciding whether to play.
+  const outlook = allSlots.reduce<DayAvailability["rainOutlook"]>((worst, slot) => {
+    if (slot.rainChance === null) return worst;
+    if (!worst || slot.rainChance > worst.peak) {
+      return { peak: slot.rainChance, atLabel: slot.label };
+    }
+    return worst;
+  }, null);
+
+  return { ...base, bands: [...bands.values()], rainOutlook: outlook };
 }
 
 function matchRule(rules: PricingRule[], dow: number, minute: number): PricingRule | undefined {
