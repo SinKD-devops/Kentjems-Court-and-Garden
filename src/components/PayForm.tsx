@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { submitProof } from "@/app/pay/[id]/actions";
 import { Countdown } from "@/components/Countdown";
 import { createSupabaseBrowser } from "@/lib/supabase/browser";
 import { formatPeso } from "@/lib/time";
@@ -53,15 +54,18 @@ export function PayForm({
         if (uploadError) throw new Error(`Could not upload the screenshot: ${uploadError.message}`);
       }
 
-      const { error: rpcError } = await supabase.rpc("submit_payment_proof", {
-        p_booking_id: bookingId,
-        p_reference: String(form.get("reference") ?? ""),
-        p_amount: amountCentavos,
-        p_sender_name: String(form.get("sender") ?? ""),
-        p_proof_path: proofPath,
-      });
+      // Recorded through the server rather than by calling the RPC directly,
+      // so the operator can be texted — the browser cannot send SMS without
+      // exposing the provider token.
+      const payload = new FormData();
+      payload.set("bookingId", bookingId);
+      payload.set("reference", String(form.get("reference") ?? ""));
+      payload.set("amount", String(amountCentavos));
+      payload.set("sender", String(form.get("sender") ?? ""));
+      if (proofPath) payload.set("proofPath", proofPath);
 
-      if (rpcError) throw new Error(rpcError.message);
+      const result = await submitProof({}, payload);
+      if (result.error) throw new Error(result.error);
 
       router.push("/my");
       router.refresh();

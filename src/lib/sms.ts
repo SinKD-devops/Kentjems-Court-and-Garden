@@ -149,4 +149,12 @@ export const smsCopy = {
 
   moved: (space: string, from: string, to: string) =>
     `Kentjems: your ${space} booking moved from ${from} to ${to}. Sorry for the change.`,
+
+  /**
+   * To the operator, not the customer. Carries enough to judge urgency from
+   * the lock screen — which slot is now held, for how much, and the reference
+   * to check against the real GCash history.
+   */
+  proofToReview: (space: string, when: string, price: string, reference: string) =>
+    `Kentjems: payment to verify. ${space} ${when}, ${price}. Ref ${reference}. The slot is held until you approve it.`,
 };
