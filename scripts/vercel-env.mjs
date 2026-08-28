@@ -67,13 +67,25 @@ if (raw === null) {
 
 const vars = [];
 const skipped = [];
+const invalid = [];
+
 for (const line of raw.split(/\r?\n/)) {
-  const trimmed = line.trim();
+  // A byte order mark ends up glued to the first name when a file is written
+  // by a Windows tool, producing a variable Next never sees — silently, since
+  // a missing variable looks exactly like an unset one.
+  const trimmed = line.replace(/﻿/g, "").trim();
   if (!trimmed || trimmed.startsWith("#")) continue;
   const eq = trimmed.indexOf("=");
   if (eq < 1) continue;
 
   const name = trimmed.slice(0, eq).trim();
+
+  // Anything that is not a plain env name would be accepted by Vercel and
+  // then never match what the code looks up.
+  if (!/^[A-Z_][A-Z0-9_]*$/i.test(name)) {
+    invalid.push(name);
+    continue;
+  }
   const value = trimmed.slice(eq + 1).trim();
   if (!value) continue;
 
@@ -85,6 +97,15 @@ for (const line of raw.split(/\r?\n/)) {
   }
 
   vars.push([name, value]);
+}
+
+if (invalid.length > 0) {
+  console.error(
+    `\nNot valid environment variable names: ${invalid.join(", ")}\n` +
+      "Usually an invisible character at the start of the line — a byte order\n" +
+      "mark, typically. Fix .env.local and run again.\n",
+  );
+  process.exit(1);
 }
 
 if (vars.length === 0) {
