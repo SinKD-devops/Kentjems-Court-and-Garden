@@ -9,12 +9,14 @@ export function ConfirmForm({
   space,
   startsAt,
   hours,
+  needsName,
   needsTerms,
   contested,
 }: {
   space: string;
   startsAt: string;
   hours: number;
+  needsName: boolean;
   needsTerms: boolean;
   contested: number;
 }) {
@@ -25,6 +27,21 @@ export function ConfirmForm({
       <input type="hidden" name="space" value={space} />
       <input type="hidden" name="startsAt" value={startsAt} />
       <input type="hidden" name="hours" value={hours} />
+
+      {needsName && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-faint">
+            Your name
+          </span>
+          <input
+            name="name"
+            autoComplete="name"
+            required
+            placeholder="So we know who has the court"
+            className="rounded-xl border border-line bg-surface px-3.5 py-3 text-[16px] font-semibold outline-none focus:border-green focus:ring-3 focus:ring-green/15"
+          />
+        </label>
+      )}
 
       {contested > 0 && (
         <p className="rounded-xl bg-tint px-3.5 py-2.5 text-[12.5px] font-semibold text-green-deep">

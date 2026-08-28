@@ -24,6 +24,8 @@ export async function createRequest(
   const acceptTerms = form.get("terms") === "on";
   const hours = Math.min(12, Math.max(1, Number(form.get("hours") ?? 1) || 1));
 
+  const name = String(form.get("name") ?? "").trim();
+
   const supabase = await createSupabaseServer();
   const {
     data: { user },
@@ -33,6 +35,18 @@ export async function createRequest(
     redirect(
       `/sign-in?next=${encodeURIComponent(`/book?space=${space}&start=${startsAt}&hours=${hours}`)}`,
     );
+  }
+
+  // Saved on the profile, not just the booking, so it is asked for once and
+  // then remembered. request_booking copies it onto the booking, which is what
+  // the operator sees at the counter — a phone number alone is no use when
+  // somebody walks up and says they have a court at seven.
+  if (name) {
+    const { error: nameError } = await supabase
+      .from("profiles")
+      .update({ full_name: name })
+      .eq("id", user.id);
+    if (nameError) return { error: nameError.message };
   }
 
   const { error } = await supabase.rpc("request_booking", {

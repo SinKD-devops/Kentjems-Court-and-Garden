@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ConfirmForm } from "@/components/ConfirmForm";
 import { getDayAvailability } from "@/lib/availability";
-import { createReadClient, getCurrentUser } from "@/lib/supabase/server";
+import { createReadClient, createSupabaseServer, getCurrentUser } from "@/lib/supabase/server";
 import { formatLongDate, formatPeso, formatTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -41,10 +41,18 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
   const total = chosen.reduce((sum, s) => sum + (s.priceCentavos ?? 0), 0);
   const contested = Math.max(...chosen.map((s) => s.waiting), 0);
 
-  const supabase = createReadClient();
+  // The profile must be read with the caller's session. Row level security
+  // limits profiles to their owner, so the anonymous client returns nothing —
+  // which made the terms checkbox reappear on every booking, however many
+  // times it had already been accepted.
+  const session = await createSupabaseServer();
   const [{ data: settings }, { data: profile }] = await Promise.all([
-    supabase.from("settings").select("support_numbers").single(),
-    supabase.from("profiles").select("accepted_terms_at").eq("id", user!.id).single(),
+    createReadClient().from("settings").select("support_numbers").single(),
+    session
+      .from("profiles")
+      .select("accepted_terms_at, full_name")
+      .eq("id", user!.id)
+      .single(),
   ]);
 
   // Any hour in the range being gone kills the whole booking — it is one
@@ -105,6 +113,7 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
               startsAt={startsAt.toISOString()}
               hours={hours}
               needsTerms={!profile?.accepted_terms_at}
+              needsName={!profile?.full_name}
               contested={contested}
             />
           </>
