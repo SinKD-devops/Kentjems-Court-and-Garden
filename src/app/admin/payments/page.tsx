@@ -1,3 +1,4 @@
+import { LiveAvailability } from "@/components/LiveAvailability";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { approvePayment, rejectPayment } from "@/app/admin/payments/actions";
@@ -48,6 +49,7 @@ export default async function PaymentQueuePage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <LiveAvailability />
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-3 pt-3">
         <Link href="/" className="text-[13px] font-semibold text-green">
           ← Customer view

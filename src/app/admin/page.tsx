@@ -1,3 +1,4 @@
+import { LiveAvailability } from "@/components/LiveAvailability";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { confirmCashPayment } from "@/app/admin/payments/actions";
@@ -92,6 +93,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <LiveAvailability />
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-3 pt-3">
         <div className="flex items-baseline justify-between">
           <p className="text-[15px] font-bold tracking-tight">Counter</p>

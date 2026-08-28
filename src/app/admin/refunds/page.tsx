@@ -1,3 +1,4 @@
+import { LiveAvailability } from "@/components/LiveAvailability";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { settleRefund } from "@/app/admin/booking/[id]/actions";
@@ -32,6 +33,7 @@ export default async function RefundsPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <LiveAvailability />
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-3 pt-3">
         <p className="text-[15px] font-bold tracking-tight">Refunds owed</p>
         <p className="text-[11px] font-medium text-soft">
