@@ -187,13 +187,13 @@ export const smsCopy = {
     `Kentjems Court and Garden. Your booking is confirmed for ${space}, ${when}. Reference ${reference}. See you there.`,
 
   rejected: (reason: string, support: string) =>
-    `Kentjems Court and Garden. We could not match your payment (${reason}), so that time is open again. Please call ${support} and we will sort it out.`,
+    `Kentjems Court and Garden. We could not match your payment (${reason}), so that time is open again. Please call ${support}.`,
 
   confirmedAtCounter: (space: string, when: string) =>
     `Kentjems Court and Garden. Your booking is confirmed for ${space}, ${when}. See you there.`,
 
   superseded: (space: string, when: string) =>
-    `Kentjems Court and Garden. Someone paid for ${space} on ${when} ahead of you, so that time is taken. Please pick another and we will hold it for you.`,
+    `Kentjems Court and Garden. Someone paid for ${space} on ${when} ahead of you, so that time is taken. Please pick another time.`,
 
   moved: (space: string, from: string, to: string) =>
     `Kentjems Court and Garden. Your ${space} booking has moved from ${from} to ${to}. Sorry for the change.`,
@@ -202,7 +202,11 @@ export const smsCopy = {
    * To the operator, not the customer. Enough to judge urgency from a lock
    * screen: which slot is now held, for how much, and the reference to check
    * against the real payment history.
+   *
+   * Kept tight because it goes to every operator number, so each payment
+   * costs one credit per person — and a message over 160 characters would
+   * quietly double that again.
    */
   proofToReview: (space: string, when: string, price: string, reference: string) =>
-    `Kentjems Court and Garden. A payment is waiting for you to check: ${space} ${when}, ${price}, reference ${reference}. That time is held until you approve it.`,
+    `Kentjems Court and Garden. Payment to check: ${space} ${when}, ${price}, ref ${reference}. Held until you approve.`,
 };
