@@ -46,7 +46,15 @@ const isBookable = (slot: Slot) => slot.state === "available" || slot.state === 
  * but only if every hour in between is actually bookable. Tapping the anchor
  * again clears it.
  */
-export function SlotGrid({ bands, spaceSlug }: { bands: PriceBand[]; spaceSlug: string }) {
+export function SlotGrid({
+  bands,
+  spaceSlug,
+  openCount,
+}: {
+  bands: PriceBand[];
+  spaceSlug: string;
+  openCount: number;
+}) {
   const slots = useMemo(() => bands.flatMap((band) => band.slots), [bands]);
 
   // Each slot's position in the flattened day, worked out once. Selection
@@ -150,24 +158,48 @@ export function SlotGrid({ bands, spaceSlug }: { bands: PriceBand[]; spaceSlug: 
         ))}
       </div>
 
-      {chosen.length > 0 && (
-        <div className="glass fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-md items-center gap-3 border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-bold tabular-nums">
-              {chosen[0].label} – {chosen[chosen.length - 1].endLabel} · {formatPeso(total)}
-            </p>
-            <p className="text-[11px] font-medium text-soft">
-              {chosen.length} hour{chosen.length === 1 ? "" : "s"} · tap another to extend
-            </p>
-          </div>
-          <Link
-            href={`/book?space=${spaceSlug}&start=${encodeURIComponent(chosen[0].startsAt)}&hours=${chosen.length}`}
-            className="flex-none rounded-full bg-green px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
-          >
-            Continue
-          </Link>
-        </div>
-      )}
+      {/*
+        One bar, always. Rendering a selection bar over a separate page footer
+        stacked two translucent glass panels, so the footer text showed through
+        the summary — the bar has to own both states instead.
+      */}
+      <div className="glass fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-md items-center gap-3 border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
+        {chosen.length > 0 ? (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold tabular-nums">
+                {chosen[0].label} – {chosen[chosen.length - 1].endLabel} · {formatPeso(total)}
+              </p>
+              <p className="text-[11px] font-medium text-soft">
+                {chosen.length} hour{chosen.length === 1 ? "" : "s"} · tap another to extend
+              </p>
+            </div>
+            <Link
+              href={`/book?space=${spaceSlug}&start=${encodeURIComponent(chosen[0].startsAt)}&hours=${chosen.length}`}
+              className="flex-none rounded-full bg-green px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
+            >
+              Continue
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold">
+                {openCount} of {slots.length} hours open
+              </p>
+              <p className="text-[11px] font-medium text-soft">
+                Tap an hour to request it — pay at the store
+              </p>
+            </div>
+            <Link
+              href="/my"
+              className="flex-none rounded-full bg-green px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
+            >
+              My bookings
+            </Link>
+          </>
+        )}
+      </div>
     </>
   );
 }

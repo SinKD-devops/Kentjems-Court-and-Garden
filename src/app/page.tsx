@@ -38,6 +38,11 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
     .flatMap((b) => b.slots)
     .filter((s) => s.state === "available" || s.state === "contested").length;
 
+  // The grid owns the bottom bar when it renders, because it has to swap
+  // between the day summary and the current selection. The page supplies one
+  // only when there is no grid.
+  const hasGrid = !availability.closedReason && availability.bands.length > 0;
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <LiveAvailability spaceId={availability.space.id} />
@@ -60,30 +65,34 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
         {availability.closedReason ? (
           <ClosedNotice reason={availability.closedReason} />
         ) : availability.space.mode === "hourly" ? (
-          <SlotGrid bands={availability.bands} spaceSlug={spaceSlug} />
+          <SlotGrid
+            bands={availability.bands}
+            spaceSlug={spaceSlug}
+            openCount={openCount}
+          />
         ) : (
           <GardenPackages availability={availability} />
         )}
       </main>
 
-      <footer className="glass fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-md items-center gap-3 border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-bold">
-            {availability.space.mode === "hourly"
-              ? `${openCount} of ${availability.bands.flatMap((b) => b.slots).length} hours open`
-              : `${availability.packages.length} package${availability.packages.length === 1 ? "" : "s"}`}
+      {/*
+        The slot grid renders its own bottom bar, because it has to swap between
+        the day summary and the current selection. This one only covers the
+        cases where there is no grid at all.
+      */}
+      {!hasGrid && (
+        <footer className="glass fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-md items-center gap-3 border-t border-[var(--glass-line)] px-4 pb-4 pt-3">
+          <p className="min-w-0 flex-1 text-[13px] font-bold">
+            {availability.closedReason ? "Closed this day" : "Nothing bookable"}
           </p>
-          <p className="text-[11px] font-medium text-soft">
-            Tap an hour to request it — pay at the store
-          </p>
-        </div>
-        <Link
-          href="/my"
-          className="flex-none rounded-full bg-green px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
-        >
-          My bookings
-        </Link>
-      </footer>
+          <Link
+            href="/my"
+            className="flex-none rounded-full bg-green px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_4px_12px_rgba(18,114,77,0.3)]"
+          >
+            My bookings
+          </Link>
+        </footer>
+      )}
     </div>
   );
 }
