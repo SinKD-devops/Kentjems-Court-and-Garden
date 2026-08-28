@@ -1,11 +1,22 @@
 # Kentjems Court and Garden — Booking App Spec
 
+> **This is the original design document.** It records why the system is shaped
+> the way it is, which is still worth reading. Where it disagrees with what was
+> actually built, [HANDOVER.md](HANDOVER.md) is the current truth — it is
+> maintained; this is not rewritten wholesale.
+>
+> Corrected below where the design moved during the build: the garden is booked
+> by the hour rather than in packages, bookings can span consecutive hours, SMS
+> goes through Semaphore rather than PhilSMS, and the Cebuano translation was
+> dropped. The venue is in Butuan City.
+
 Installable web app (PWA) for booking one outdoor court and one garden space.
 Payment is cash over the counter at Kentjems Store. Single operator.
 
 ## Stack
 Next.js (App Router) + Supabase (Postgres, phone OTP auth, realtime) on Vercel.
-i18n via next-intl — English default, Cebuano toggle. All strings externalised from day one.
+English only. A Cebuano toggle was planned and dropped during the build;
+next-intl was removed rather than left implying a feature that is not coming.
 Timezone: Asia/Manila. Timestamps STORED IN UTC, RENDERED in Manila time. The 17:00
 rate boundary and the 24:00 day boundary make this a real correctness issue, not
 boilerplate — a tz bug puts slots on the wrong date.
@@ -14,24 +25,22 @@ boilerplate — a tz bug puts slots on the wrong date.
 
 | | Court | Garden |
 |---|---|---|
-| Booking mode | Fixed 1-hour slots | Fixed event packages |
-| Hours | 6:00–24:00 (18 slots/day) | Per package |
-| Day rate | PHP 60/hr — starts 06:00–17:00 (12 slots) | per package |
-| Evening rate | PHP 100/hr — starts 18:00–23:00 (6 slots) | per package |
+| Booking mode | Hourly, 1–12 consecutive hours | Hourly, 1–12 consecutive hours |
+| Hours | 6:00–24:00 (18 slots/day) | 6:00–24:00 (18 slots/day) |
+| Day rate | PHP 60/hr, 06:00–18:00 | PHP 250/hr, 06:00–18:00 |
+| Evening rate | PHP 100/hr, 18:00–24:00 | PHP 350/hr, 18:00–24:00 |
 | Advance window | 7 days | 30 days |
 | Open requests per user | 1 (per space) | 1 (per space) |
-| Extra fields | — | event type, needs tables/chairs, needs sound |
+| Extra fields | — | — (packages retired; the garden is hourly) |
 
 Fully independent timelines. Max court revenue/day: (12 x 60) + (6 x 100) = PHP 1,320.
 Rates are for the WHOLE COURT, not per person. No headcount field on court bookings.
 The request limit is PER SPACE: a pending garden event must not block a court booking.
 
-Garden packages are defined by the operator in admin later. v1 ships the packages
-table + admin CRUD, and the garden tab must render an empty state until packages exist.
+Packages were retired when the garden moved to hourly booking. The `packages`
+table remains because bookings reference it, and dropping it would break
+history.
 
-Seed package (first real one, more added by the operator):
-  BIRTHDAY — 4 hours — PHP 750
-Package durations are operator-chosen start times within 06:00-24:00.
 
 ## Core mechanic: request, then race to pay
 
@@ -71,25 +80,31 @@ Overlap prevention lives in Postgres, not app code:
 
     CREATE EXTENSION IF NOT EXISTS btree_gist;
 
-    ALTER TABLE bookings ADD CONSTRAINT no_confirmed_overlap
+    ALTER TABLE bookings ADD CONSTRAINT no_live_overlap
       EXCLUDE USING gist (
         space_id WITH =,
         tstzrange(starts_at, ends_at) WITH &&
-      ) WHERE (status = 'confirmed');
+      ) WHERE (status IN ('confirmed', 'proof_submitted'));
+
+proof_submitted was added when online payment arrived: once the money has
+left the customer's account the slot is held, because there is no refund API.
 
 ### Expiry is computed, not scheduled
 Availability queries treat `status='requested' AND expires_at < now()` as dead.
 A pg_cron sweep every minute is housekeeping only — never the source of truth.
 
 ### Live updates
-Supabase realtime on `bookings`. Confirming at the counter darkens the slot on
-every open phone within ~1s.
+Supabase realtime on `availability_pulse`, a per-space counter bumped by
+triggers on bookings, payments and refunds. NOT on `bookings` directly: RLS
+hides other customers' rows so a direct subscription delivers nothing, and
+relaxing it would leak names and numbers because RLS filters rows, not columns.
+Confirming at the counter darkens the slot on every open phone within ~1s.
 
 ## Data model
-- spaces          — court, garden; booking_mode: hourly | package
+- spaces          — court, garden; both booking_mode hourly
 - bookings        — space_id, user_id, starts_at, ends_at, status, price,
                     expires_at, event_type, needs_tables, needs_sound, source
-- packages        — space_id, name, duration, price, active
+- packages        — retired; kept because bookings reference it
 - pricing_rules   — space_id, day_of_week, start_time, end_time, price
 - opening_hours   — space_id, day_of_week, open, close
 - closures        — space_id, range, reason (maintenance, blackout)
@@ -106,7 +121,7 @@ every open phone within ~1s.
 ### Customer
 1. Space picker (Court / Garden)
 2. Court: date strip + hourly slot grid, live availability, price per slot
-3. Garden: package list + date picker
+3. Garden: same hourly grid, with a jump-to-date field for its 30-day window
 4. Confirm — price, expiry warning, "Go to Kentjems Store now"
 5. Active request — visible countdown, push at T-10min
 6. My bookings — upcoming and past
@@ -119,7 +134,8 @@ every open phone within ~1s.
 4. Refunds — approve force-majeure cancellations
 5. Reports — daily/weekly revenue, day vs evening split, occupancy by hour
 6. Move booking — reassign a booking to another free slot, same space
-7. Settings — hours, rates, packages, closures
+7. Settings — hours, rates, payment window, payee details, closures
+8. Find — search every booking by name or number, any date
 
 ACCOUNTS & RECOVERY
 Two operator-capable phone numbers, both able to approve payments and take
@@ -134,15 +150,21 @@ public complaint instead of a conversation.
 
 ## Notifications
 
-Provider: **PhilSMS** — PHP 0.35/SMS, no minimum top-up, free trial credits.
-Cheapest local rate found; BulkSMS PH only reaches 0.35 at a 50,000-credit
-(PHP 17,500) tier with credits expiring after a year — a volume this venue
-will never reach.
+Provider: **Semaphore** — about PHP 0.50/SMS, covers Globe, Smart, Sun and DITO.
 
-Supabase native phone auth does not support PhilSMS (only Twilio, MessageBird,
-Vonage, TextLocal), so OTP routes through Supabase's Send SMS hook: an Edge
-Function that calls the PhilSMS HTTP API. This keeps the provider swappable —
-changing vendor is one function, not an auth migration.
+It replaced PhilSMS during the build. PhilSMS was cheaper at PHP 0.35 and
+delivered reliably to Globe, but silently never delivered to Smart or TNT while
+still reporting "Delivered" and charging for every message. Four people
+requested a sign-in message and received nothing. Cheaper per message is
+meaningless if the message does not arrive.
+
+Supabase native phone auth supports neither (only Twilio, MessageBird, Vonage
+and TextLocal), so the sign-in message routes through Supabase's Send SMS hook,
+implemented as a Postgres function calling the provider over pg_net. That is
+what made the provider swap cost two files and one database function.
+
+Message copy must survive Philippine carrier filtering and stay inside the GSM
+alphabet. See §4 of HANDOVER.md before changing any of it.
 
 ### Push-first policy
 Web push is free; SMS is not. Channel per event:
@@ -177,8 +199,9 @@ Estimated volume at full occupancy: ~1,500-2,000 SMS/month = PHP 525-700.
 Keeping the expiry reminder push-only cuts roughly a third of message volume —
 a larger saving than the choice of provider.
 
-BEFORE LAUNCH: verify OTP deliverability to both Globe and Smart using PhilSMS
-trial credits. Deliverability varies by vendor and matters more than centavos.
+BEFORE LAUNCH: verify sign-in deliverability to both Globe and Smart using
+Semaphore. Deliverability varies by vendor and matters far more than centavos —
+this is exactly what PhilSMS got wrong.
 
 ## PWA / installability
 - manifest.webmanifest: display standalone, start_url /, theme + background colors
@@ -419,11 +442,15 @@ large headings, generous line height in body copy.
 3. Phone OTP auth, request creation, 30-min expiry, realtime updates
 4. Counter console: pending queue, mark-paid, walk-in entry
 5. GCash proof submission + operator review queue
-6. PWA shell, icons, iOS install sheet, push + SMS (PhilSMS)
-   + weather forecast on the court booking screen (OpenWeather free tier)
+6. PWA shell, icons, iOS install sheet, push + SMS (Semaphore)
+   + weather forecast on the booking screen (Open-Meteo, no API key needed)
 7. Reports, refunds, move-booking, reconciliation
 
-Steps 1–4 are a working business. 5–7 are additive.
+Steps 1-4 are a working business. 5-7 are additive.
+
+All seven are built. What remains is not code: an approved Semaphore sender
+name, Vercel environment variables, rotated credentials, and a paid Supabase
+tier. See HANDOVER.md section 7.
 
 ## Known risks
 - 30-minute expiry is aggressive. Defensible for protecting prime slots against
