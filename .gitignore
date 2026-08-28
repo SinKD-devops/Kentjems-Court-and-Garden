@@ -45,3 +45,6 @@ desktop.ini
 
 # typescript build cache
 *.tsbuildinfo
+
+# scratch scripts
+*.tmp.mjs
