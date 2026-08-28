@@ -115,26 +115,36 @@ export async function getDayAvailability(
   spaceSlug: string,
   date: DateKey,
   now: Date = new Date(),
+  /**
+   * Pass the space when the caller already has it. Round trips to the
+   * database are sequential and dominate page latency, so looking it up
+   * again costs a whole extra one for information already in hand.
+   */
+  known?: Space,
 ): Promise<DayAvailability> {
   const supabase = createReadClient();
 
-  const { data: spaceRow, error: spaceError } = await supabase
-    .from("spaces")
-    .select("id, slug, name, mode, advance_days")
-    .eq("slug", spaceSlug)
-    .single();
+  let space = known;
 
-  if (spaceError || !spaceRow) {
-    throw new Error(`Unknown space "${spaceSlug}".`);
+  if (!space) {
+    const { data: spaceRow, error: spaceError } = await supabase
+      .from("spaces")
+      .select("id, slug, name, mode, advance_days")
+      .eq("slug", spaceSlug)
+      .single();
+
+    if (spaceError || !spaceRow) {
+      throw new Error(`Unknown space "${spaceSlug}".`);
+    }
+
+    space = {
+      id: spaceRow.id,
+      slug: spaceRow.slug,
+      name: spaceRow.name,
+      mode: spaceRow.mode,
+      advanceDays: spaceRow.advance_days,
+    };
   }
-
-  const space: Space = {
-    id: spaceRow.id,
-    slug: spaceRow.slug,
-    name: spaceRow.name,
-    mode: spaceRow.mode,
-    advanceDays: spaceRow.advance_days,
-  };
 
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);

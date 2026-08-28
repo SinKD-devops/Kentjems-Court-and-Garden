@@ -33,7 +33,7 @@ export default async function BookingPage({ searchParams }: PageProps<"/">) {
   const requestedDate = typeof params.date === "string" ? params.date : undefined;
   const date = requestedDate && dates.includes(requestedDate) ? requestedDate : today;
 
-  const availability = await getDayAvailability(spaceSlug, date);
+  const availability = await getDayAvailability(spaceSlug, date, new Date(), space);
   const openCount = availability.bands
     .flatMap((b) => b.slots)
     .filter((s) => s.state === "available" || s.state === "contested").length;
