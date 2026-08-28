@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { confirmCashPayment } from "@/app/admin/payments/actions";
 import { AdminNav } from "@/components/AdminNav";
+import { CloseToday } from "@/components/CloseToday";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import {
   endOfDay,
@@ -60,7 +61,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
   const date = typeof params.date === "string" ? params.date : todayKey();
   const search = typeof params.q === "string" ? params.q.trim() : "";
 
-  const [{ data: schedule }, { count: pendingReview }] = await Promise.all([
+  const [{ data: schedule }, { count: pendingReview }, { data: spaceList }] = await Promise.all([
     supabase
       .from("operator_schedule")
       .select("*")
@@ -70,6 +71,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
     supabase
       .from("payment_review_queue")
       .select("*", { count: "exact", head: true }),
+    supabase.from("spaces").select("id, name").order("sort_order"),
   ]);
 
   const rows = (schedule ?? []) as ScheduleRow[];
@@ -111,6 +113,8 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
       </header>
 
       <main className="flex flex-1 flex-col gap-5 px-4 pb-8 pt-4">
+        <CloseToday spaces={(spaceList ?? []).map((s) => ({ id: s.id, name: s.name }))} />
+
         <section className="flex gap-2">
           <Stat label="Booked" value={String(confirmed.length)} />
           <Stat label="Awaiting payment" value={String(awaiting.length)} />

@@ -40,13 +40,15 @@ export default async function ReportsPage() {
   if (profile?.role !== "operator") redirect("/");
 
   const today = todayKey();
-  const weekAgo = shiftDateKey(today, -6);
+  // Thirty days: long enough to compare weeks and spot a monthly pattern,
+  // short enough that the by-day list stays readable on a phone.
+  const from = shiftDateKey(today, -29);
 
   const [{ data: days }, { data: hours }] = await Promise.all([
     supabase
       .from("revenue_by_day")
       .select("*")
-      .gte("local_date", weekAgo)
+      .gte("local_date", from)
       .lte("local_date", today)
       .order("local_date", { ascending: false }),
     supabase.from("occupancy_by_hour").select("*").order("local_hour"),
@@ -55,8 +57,8 @@ export default async function ReportsPage() {
   const dayRows = (days ?? []) as DayRow[];
   const hourRows = (hours ?? []) as HourRow[];
 
-  const weekTotal = dayRows.reduce((sum, r) => sum + r.centavos, 0);
-  const weekHours = dayRows.reduce((sum, r) => sum + r.hours_sold, 0);
+  const periodTotal = dayRows.reduce((sum, r) => sum + r.centavos, 0);
+  const periodHours = dayRows.reduce((sum, r) => sum + r.hours_sold, 0);
   const todayTotal = dayRows
     .filter((r) => r.local_date === today)
     .reduce((sum, r) => sum + r.centavos, 0);
@@ -73,7 +75,7 @@ export default async function ReportsPage() {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-3 pt-3">
         <p className="text-[15px] font-bold tracking-tight">Reports</p>
-        <p className="text-[11px] font-medium text-soft">Last 7 days</p>
+        <p className="text-[11px] font-medium text-soft">Last 30 days</p>
         <div className="mt-2.5">
           <AdminNav active="/admin/reports" />
         </div>
@@ -82,8 +84,8 @@ export default async function ReportsPage() {
       <main className="flex flex-1 flex-col gap-5 px-4 pb-8 pt-4">
         <section className="flex gap-2">
           <Stat label="Today" value={formatPeso(todayTotal)} />
-          <Stat label="This week" value={formatPeso(weekTotal)} />
-          <Stat label="Hours sold" value={String(weekHours)} />
+          <Stat label="Last 30 days" value={formatPeso(periodTotal)} />
+          <Stat label="Hours sold" value={String(periodHours)} />
         </section>
 
         <section className="flex flex-col gap-2">
@@ -91,7 +93,7 @@ export default async function ReportsPage() {
             By day
           </h2>
           {byDate.size === 0 ? (
-            <Empty>No bookings in the last 7 days.</Empty>
+            <Empty>No bookings in the last 30 days.</Empty>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {[...byDate.entries()].map(([date, rows]) => {
