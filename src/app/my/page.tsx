@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { withdrawRequest } from "@/app/book/actions";
 import { signOut } from "@/app/sign-in/actions";
 import { Countdown } from "@/components/Countdown";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { formatLongDate, formatPeso, formatTime } from "@/lib/time";
 
@@ -64,6 +65,10 @@ export default async function MyBookingsPage() {
         )}
 
         {live.length > 0 && <Section title="Active">{live.map(Row)}</Section>}
+
+        {/* Offered only once they have booked something — asking before that
+            is how install prompts get dismissed for good. */}
+        {rows.length > 0 && <InstallPrompt />}
         {done.length > 0 && <Section title="Past">{done.map(Row)}</Section>}
 
         <form action={signOut} className="pt-2">
