@@ -51,6 +51,16 @@ export async function createWalkIn(
 
   const result = data as { space: string; superseded: SupersededRow[] };
 
+  // Confirm to the customer even though they are standing right here: the text
+  // is their record of the booking, and the only thing they can show up with
+  // if there is ever a disagreement about the time.
+  const endsAt = new Date(new Date(startsAt).getTime() + hours * 3_600_000).toISOString();
+  const sent = await sendSms(
+    phone,
+    smsCopy.confirmedAtCounter(result.space, describe(startsAt, endsAt)),
+  );
+  if (!sent.ok) console.error("Walk-in confirmation SMS failed:", sent.error);
+
   // Anyone who was still hoping to pay for this time has just lost it.
   await Promise.all(
     (result.superseded ?? [])

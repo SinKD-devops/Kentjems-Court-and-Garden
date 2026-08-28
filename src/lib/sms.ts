@@ -1,5 +1,7 @@
 import "server-only";
 
+import { normalizePhPhone } from "@/lib/phone";
+
 /**
  * PhilSMS client.
  *
@@ -18,11 +20,31 @@ export interface SmsResult {
   error?: string;
 }
 
+/**
+ * PhilSMS requires E.164. Numbers reach here in three shapes and none of them
+ * are it: Supabase stores a signed-in customer's phone without the leading
+ * plus ("639171234567"), walk-ins are typed at the counter in local form
+ * ("0917 123 4567"), and only some callers pass "+63...".
+ *
+ * Normalising here rather than at each call site means a new caller cannot
+ * reintroduce the bug by forgetting.
+ */
+function toE164(raw: string): string {
+  const normalized = normalizePhPhone(raw);
+  if (normalized) return normalized;
+
+  // Not a Philippine mobile — pass it through, but never without the plus.
+  const digits = raw.replace(/[^\d]/g, "");
+  return digits.startsWith("+") ? digits : `+${digits}`;
+}
+
 export async function sendSms(to: string, message: string): Promise<SmsResult> {
   const token = process.env.PHILSMS_API_TOKEN;
   const senderId = process.env.PHILSMS_SENDER_ID;
 
   if (!token) return { ok: false, error: "PHILSMS_API_TOKEN is not set." };
+
+  const recipient = toE164(to);
 
   try {
     const response = await fetch(`${API_URL}/sms/send`, {
@@ -33,7 +55,7 @@ export async function sendSms(to: string, message: string): Promise<SmsResult> {
         Accept: "application/json",
       },
       body: JSON.stringify({
-        recipient: to,
+        recipient,
         sender_id: senderId,
         type: "plain",
         message,
@@ -45,7 +67,9 @@ export async function sendSms(to: string, message: string): Promise<SmsResult> {
       | null;
 
     if (!response.ok || body?.status === "error") {
-      return { ok: false, error: body?.message ?? `PhilSMS returned ${response.status}` };
+      const detail = body?.message ?? `PhilSMS returned ${response.status}`;
+      console.error(`SMS to ${recipient} rejected: ${detail}`);
+      return { ok: false, error: detail };
     }
     return { ok: true };
   } catch (error) {
