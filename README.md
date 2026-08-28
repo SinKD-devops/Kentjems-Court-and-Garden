@@ -25,6 +25,33 @@ npm run dev
 
 Tests skip rather than fail when `DATABASE_URL` is absent.
 
+## Deploying to Vercel
+
+Environment variables can be pushed from `.env.local` rather than typed in:
+
+```bash
+npm i -g vercel && vercel login && vercel link
+```
+
+```bash
+npm run vercel:env
+```
+
+`DATABASE_URL` is deliberately never sent. It is a superuser connection used
+only for migrations and tests, and a web app runtime has no business holding
+it — if the app is compromised, that is the difference between losing what RLS
+allows and losing everything.
+
+Set `NEXT_PUBLIC_SITE_URL` to the real Vercel URL first. The script refuses to
+run while it points at localhost, because the reminder and purge jobs call it
+and Supabase cannot reach a laptop.
+
+After pushing, redeploy: environment changes do not apply to existing builds.
+Then re-run `npm run db:secrets` so the scheduled jobs call the deployed URL.
+
+Also check **Settings → Deployment Protection** is off for production, or
+customers hit a Vercel login wall.
+
 ## Supabase settings that are not in this repo
 
 Two things live in the Supabase dashboard and have to be set by hand.
