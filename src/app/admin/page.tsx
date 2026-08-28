@@ -3,7 +3,15 @@ import { redirect } from "next/navigation";
 import { confirmCashPayment } from "@/app/admin/payments/actions";
 import { AdminNav } from "@/components/AdminNav";
 import { createSupabaseServer } from "@/lib/supabase/server";
-import { endOfDay, formatLongDate, formatPeso, formatTime, startOfDay, todayKey } from "@/lib/time";
+import {
+  endOfDay,
+  formatLongDate,
+  formatPeso,
+  formatTime,
+  shiftDateKey,
+  startOfDay,
+  todayKey,
+} from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +100,9 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
           </Link>
         </div>
         <p className="text-[11px] font-medium text-soft">{formatLongDate(date)}</p>
+        <div className="mt-2">
+          <ScheduleDates date={date} />
+        </div>
         <div className="mt-2.5">
           <AdminNav active="/admin" pending={pendingReview ?? 0} />
         </div>
@@ -212,6 +223,53 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="flex-1 rounded-2xl border border-line bg-surface px-3 py-2.5">
       <p className="text-[17px] font-bold tabular-nums">{value}</p>
       <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-faint">{label}</p>
+    </div>
+  );
+}
+
+/**
+ * Date navigation for the schedule.
+ *
+ * The page always read a `date` parameter but nothing could change it, so the
+ * operator could only ever see today — no checking tomorrow's bookings, no
+ * looking back at last Saturday's takings.
+ *
+ * Plain links rather than a picker: yesterday, today and tomorrow cover nearly
+ * every reason to look, and the date input handles the rest.
+ */
+function ScheduleDates({ date }: { date: string }) {
+  const today = todayKey();
+  const steps = [
+    { label: "Yesterday", value: shiftDateKey(today, -1) },
+    { label: "Today", value: today },
+    { label: "Tomorrow", value: shiftDateKey(today, 1) },
+  ];
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {steps.map((step) => (
+        <Link
+          key={step.value}
+          href={`/admin?date=${step.value}`}
+          aria-current={step.value === date ? "date" : undefined}
+          className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+            step.value === date ? "bg-green text-white" : "border border-line bg-surface text-soft"
+          }`}
+        >
+          {step.label}
+        </Link>
+      ))}
+      <form className="ml-auto">
+        <input
+          type="date"
+          name="date"
+          defaultValue={date}
+          className="rounded-lg border border-line bg-surface px-2 py-1 text-[12px] font-semibold tabular-nums"
+        />
+        <button type="submit" className="ml-1 text-[12px] font-semibold text-green">
+          Go
+        </button>
+      </form>
     </div>
   );
 }

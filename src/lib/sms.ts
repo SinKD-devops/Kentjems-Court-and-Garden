@@ -38,11 +38,42 @@ function toE164(raw: string): string {
   return digits.startsWith("+") ? digits : `+${digits}`;
 }
 
-export async function sendSms(to: string, message: string): Promise<SmsResult> {
+/**
+ * Records every attempt, successful or not.
+ *
+ * Written with the secret key because it runs outside any customer session,
+ * and deliberately swallows its own errors: a logging failure must never stop
+ * a booking confirmation going out.
+ */
+async function logSms(recipient: string, kind: string, ok: boolean, error?: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) return;
+
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    await supabase.from("sms_log").insert({ recipient, kind, ok, error: error ?? null });
+  } catch (caught) {
+    console.error("Could not log SMS:", caught);
+  }
+}
+
+export async function sendSms(
+  to: string,
+  message: string,
+  kind = "unknown",
+): Promise<SmsResult> {
   const token = process.env.PHILSMS_API_TOKEN;
   const senderId = process.env.PHILSMS_SENDER_ID;
 
-  if (!token) return { ok: false, error: "PHILSMS_API_TOKEN is not set." };
+  if (!token) {
+    const error = "PHILSMS_API_TOKEN is not set.";
+    await logSms(to, kind, false, error);
+    return { ok: false, error };
+  }
 
   const recipient = toE164(to);
 
@@ -68,12 +99,16 @@ export async function sendSms(to: string, message: string): Promise<SmsResult> {
 
     if (!response.ok || body?.status === "error") {
       const detail = body?.message ?? `PhilSMS returned ${response.status}`;
-      console.error(`SMS to ${recipient} rejected: ${detail}`);
+      console.error(`SMS to  rejected: `);
+      await logSms(recipient, kind, false, detail);
       return { ok: false, error: detail };
     }
+    await logSms(recipient, kind, true);
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "SMS request failed" };
+    const detail = error instanceof Error ? error.message : "SMS request failed";
+    await logSms(recipient, kind, false, detail);
+    return { ok: false, error: detail };
   }
 }
 

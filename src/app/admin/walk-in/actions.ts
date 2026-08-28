@@ -58,6 +58,7 @@ export async function createWalkIn(
   const sent = await sendSms(
     phone,
     smsCopy.confirmedAtCounter(result.space, describe(startsAt, endsAt)),
+    "walk-in",
   );
   if (!sent.ok) console.error("Walk-in confirmation SMS failed:", sent.error);
 
@@ -69,6 +70,7 @@ export async function createWalkIn(
         const sent = await sendSms(
           row.phone as string,
           smsCopy.superseded(result.space, describe(row.starts_at, row.ends_at)),
+          "superseded",
         );
         if (!sent.ok) console.error("Superseded SMS failed:", row.id, sent.error);
       }),

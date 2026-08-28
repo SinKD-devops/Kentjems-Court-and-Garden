@@ -71,6 +71,7 @@ async function notifySuperseded(result: ConfirmResult) {
         const sent = await sendSms(
           row.phone as string,
           smsCopy.superseded(result.space, describe(row.starts_at, row.ends_at)),
+          "superseded",
         );
         if (!sent.ok) console.error("Superseded SMS failed:", row.id, sent.error);
       }),
@@ -93,6 +94,7 @@ export async function approvePayment(form: FormData) {
     const sent = await sendSms(
       summary.phone,
       smsCopy.approved(summary.space, summary.when, reference),
+      "payment-approved",
     );
     if (!sent.ok) console.error("Approval SMS failed:", sent.error);
   }
@@ -116,6 +118,7 @@ export async function confirmCashPayment(form: FormData) {
     const sent = await sendSms(
       summary.phone,
       smsCopy.confirmedAtCounter(summary.space, summary.when),
+      "cash-confirmed",
     );
     if (!sent.ok) console.error("Cash confirmation SMS failed:", sent.error);
   }
@@ -142,7 +145,7 @@ export async function rejectPayment(form: FormData) {
   const support = (settings?.support_numbers ?? [])[0] ?? "";
 
   if (summary?.phone) {
-    const sent = await sendSms(summary.phone, smsCopy.rejected(reason, support));
+    const sent = await sendSms(summary.phone, smsCopy.rejected(reason, support), "payment-rejected");
     if (!sent.ok) console.error("Rejection SMS failed:", sent.error);
   }
 

@@ -56,6 +56,7 @@ export async function moveBooking(
         describe(result.from_starts_at, result.from_ends_at),
         describe(result.to_starts_at, result.to_ends_at),
       ),
+      "booking-moved",
     );
     if (!sent.ok) console.error("Move SMS failed:", sent.error);
   }
@@ -95,6 +96,7 @@ export async function refundBooking(
       result.phone,
       `Kentjems: your ${result.space} booking on ${describe(result.starts_at, result.ends_at)} is cancelled (${reason}). ` +
         `Collect your ${formatPeso(result.amount_centavos)} refund at Kentjems Store. Call ${support}.`,
+      "refund-approved",
     );
     if (!sent.ok) console.error("Refund SMS failed:", sent.error);
   }
