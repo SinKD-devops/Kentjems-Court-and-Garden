@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { PriceBand, Slot } from "@/lib/availability";
 import { formatPeso } from "@/lib/time";
+import { RAIN_LIKELY, rainWarning } from "@/lib/rain";
 
 const STATE_CLASS: Record<Slot["state"], string> = {
   available: "slot",
@@ -133,6 +134,7 @@ export function SlotGrid({ bands, spaceSlug }: { bands: PriceBand[]; spaceSlug: 
                       >
                         <span className="slot-time">{slot.label}</span>
                         <span className="slot-meta">{on ? "Selected" : meta(slot)}</span>
+                        <RainHint slot={slot} />
                       </button>
                     ) : (
                       <div className={STATE_CLASS[slot.state]} aria-disabled="true">
@@ -167,5 +169,27 @@ export function SlotGrid({ bands, spaceSlug }: { bands: PriceBand[]; spaceSlug: 
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Rain warning on a slot.
+ *
+ * Shown only above 40%: a hint on every tile becomes wallpaper, and the point
+ * is to catch the eye when it might actually change the choice. Advisory only
+ * — people play in light rain, and the booking is never blocked.
+ */
+function RainHint({ slot }: { slot: Slot }) {
+  const warning = slot.rainChance === null ? null : rainWarning(slot.rainChance);
+  if (!warning) return null;
+
+  return (
+    <span
+      className={`mt-0.5 text-[10px] font-bold ${
+        slot.rainChance! >= RAIN_LIKELY ? "text-amber" : "text-soft"
+      }`}
+    >
+      ☂ {slot.rainChance}%
+    </span>
   );
 }

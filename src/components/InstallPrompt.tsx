@@ -154,11 +154,21 @@ function ShareIcon() {
   );
 }
 
-/** Registers the service worker. Separate so it can run on every page. */
+/**
+ * Registers the service worker — in production only.
+ *
+ * A service worker in development is worse than useless: it caches build
+ * assets that change on every keystroke, so you end up debugging yesterday's
+ * JavaScript. The dev server also serves the script in a way Chrome refuses to
+ * register, which produced a console error on every page load.
+ *
+ * Registration failing must never break the page, hence the catch.
+ */
 export function ServiceWorkerRegister() {
   useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
-    // Registration failing must never break the page.
+
     navigator.serviceWorker
       .register("/sw.js")
       .catch((error) => console.error("Service worker registration failed:", error));

@@ -1,4 +1,5 @@
 import { createReadClient } from "@/lib/supabase/server";
+import { type HourForecast, getForecast } from "@/lib/weather";
 import {
   type DateKey,
   addDays,
@@ -39,6 +40,7 @@ export interface Slot {
   endLabel: string;
   priceCentavos: number | null;
   state: SlotState;
+  rainChance: number | null;
   waiting: number;
 }
 
@@ -149,6 +151,10 @@ export async function getDayAvailability(
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
   const dow = dayOfWeek(date);
+
+  // Fetched alongside availability rather than after it: the forecast is an
+  // outside service and must not add a sequential round trip to page load.
+  const forecast = await getForecastFor(supabase, date);
 
   const [hours, pricing, packages, live, demand, closures] = await Promise.all([
     supabase
@@ -261,6 +267,7 @@ export async function getDayAvailability(
       endLabel: formatTime(endsAt),
       priceCentavos: rule?.price_centavos ?? null,
       state,
+      rainChance: forecast.get(startsAt.toISOString())?.rainChance ?? null,
       waiting,
     };
 
@@ -301,3 +308,16 @@ function overlaps(
 }
 
 export { addDays };
+
+/**
+ * Forecast for the venue, or an empty map if it is unavailable or the
+ * coordinates are unset. Both spaces are outdoors, so this applies to each.
+ */
+async function getForecastFor(
+  supabase: ReturnType<typeof createReadClient>,
+  date: DateKey,
+): Promise<Map<string, HourForecast>> {
+  const { data } = await supabase.from("settings").select("latitude, longitude").single();
+  if (!data?.latitude || !data?.longitude) return new Map();
+  return getForecast(Number(data.latitude), Number(data.longitude), date);
+}
