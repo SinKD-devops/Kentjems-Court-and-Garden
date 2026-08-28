@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { approvePayment, rejectPayment } from "@/app/admin/payments/actions";
+import { AdminNav } from "@/components/AdminNav";
 import { ProofImage } from "@/components/ProofImage";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { formatPeso, formatTime } from "@/lib/time";
@@ -49,7 +50,7 @@ export default async function PaymentQueuePage() {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="glass sticky top-0 z-10 border-b border-[var(--glass-line)] px-4 pb-3 pt-3">
         <Link href="/" className="text-[13px] font-semibold text-green">
-          ← Slots
+          ← Customer view
         </Link>
         <p className="mt-1 text-[15px] font-bold tracking-tight">Payments to review</p>
         <p className="text-[11px] font-medium text-soft">
@@ -57,6 +58,9 @@ export default async function PaymentQueuePage() {
             ? "Nothing waiting"
             : `${rows.length} waiting · oldest first`}
         </p>
+        <div className="mt-2.5">
+          <AdminNav active="/admin/payments" pending={rows.length} />
+        </div>
       </header>
 
       <main className="flex flex-1 flex-col gap-3 px-4 pb-24 pt-4">
