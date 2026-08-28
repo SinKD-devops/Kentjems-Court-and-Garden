@@ -8,7 +8,8 @@
 > Corrected below where the design moved during the build: the garden is booked
 > by the hour rather than in packages, bookings can span consecutive hours, SMS
 > goes through Semaphore rather than PhilSMS, and the Cebuano translation was
-> dropped. The venue is in Butuan City.
+> dropped. The venue is in Butuan City. Web push was removed after the build,
+> on 29 August 2026 — SMS is the only notification channel now.
 
 Installable web app (PWA) for booking one outdoor court and one garden space.
 Payment is cash over the counter at Kentjems Store. Single operator.
@@ -123,7 +124,7 @@ Confirming at the counter darkens the slot on every open phone within ~1s.
 2. Court: date strip + hourly slot grid, live availability, price per slot
 3. Garden: same hourly grid, with a jump-to-date field for its 30-day window
 4. Confirm — price, expiry warning, "Go to Kentjems Store now"
-5. Active request — visible countdown, push at T-10min
+5. Active request — visible countdown (the T-10min push was removed)
 6. My bookings — upcoming and past
 
 ### Operator (single account, phone-first counter console)
@@ -166,19 +167,29 @@ what made the provider swap cost two files and one database function.
 Message copy must survive Philippine carrier filtering and stay inside the GSM
 alphabet. See §4 of HANDOVER.md before changing any of it.
 
-### Push-first policy
-Web push is free; SMS is not. Channel per event:
+### Push-first policy — SUPERSEDED, push was removed
+The channel table as built, after web push was removed on 29 August 2026:
 
 | Event                            | Channel           |
 |----------------------------------|-------------------|
 | OTP login                        | SMS (only option) |
-| GCash payment APPROVED           | SMS + push        |
-| GCash payment REJECTED           | SMS + push        |
-| Counter (cash) payment confirmed | SMS + push        |
-| Request superseded (lost slot)   | SMS + push        |
-| Booking moved by operator        | SMS + push        |
-| Request expiring (T-10 min)      | Push only         |
-| Refund approved                  | Push only         |
+| GCash payment APPROVED           | SMS               |
+| GCash payment REJECTED           | SMS               |
+| Counter (cash) payment confirmed | SMS               |
+| Request superseded (lost slot)   | SMS               |
+| Booking moved by operator        | SMS               |
+| Request expiring (T-10 min)      | none — dropped    |
+| Refund approved                  | none — never built |
+
+The push half of the "SMS + push" rows was never wired; those events always
+went out by SMS alone. Only the expiry reminder ever sent a push, and it was
+dropped rather than converted to SMS — at roughly a third of message volume it
+was the most expensive notification here and the only one not tied to a
+payment. "Refund approved" was specified push-only and never implemented, so
+its removal changed nothing. See HANDOVER §3.
+
+The original reasoning below still holds and is why SMS carries everything
+that matters:
 
 Every outcome where MONEY HAS MOVED goes by SMS. Push alone is not enough: it
 requires the app installed and notifications granted, and on iOS it only works
@@ -196,8 +207,9 @@ A rejection SMS MUST carry a support number. The customer believes they paid;
 being told no with no way to reply is how this becomes a public complaint.
 
 Estimated volume at full occupancy: ~1,500-2,000 SMS/month = PHP 525-700.
-Keeping the expiry reminder push-only cuts roughly a third of message volume —
-a larger saving than the choice of provider.
+Dropping the expiry reminder entirely — rather than pushing it or texting it —
+cuts roughly a third of message volume, a larger saving than the choice of
+provider.
 
 BEFORE LAUNCH: verify sign-in deliverability to both Globe and Smart using
 Semaphore. Deliverability varies by vendor and matters far more than centavos —
@@ -214,8 +226,9 @@ this is exactly what PhilSMS got wrong.
 - Service worker: cache app shell + offline page ONLY.
   NEVER cache availability data — a stale grid sends someone to the store
   for a slot that sold ten minutes ago.
-- Web push on iOS requires home-screen install, which makes the 30-minute
-  countdown reminder a genuine reason to install.
+- Web push was removed on 29 August 2026, which also removed the strongest
+  reason to install: the 30-minute countdown reminder. Installing is now a
+  convenience (home-screen launch, offline page), not a feature gate.
 
 ## Payment methods
 
@@ -288,7 +301,7 @@ PERSISTS overnight and is reviewed from 6am — it is never auto-rejected, since
 the money has genuinely been sent.
 
 ### Operator review queue
-New proof triggers push + SMS to the operator immediately. The queue shows, per
+New proof triggers an SMS to the operator immediately. The queue shows, per
 item: slot, space, expected vs claimed amount, reference number, sender name,
 screenshot thumbnail, duplicate/mismatch flags, and Approve / Reject.
 
@@ -442,7 +455,7 @@ large headings, generous line height in body copy.
 3. Phone OTP auth, request creation, 30-min expiry, realtime updates
 4. Counter console: pending queue, mark-paid, walk-in entry
 5. GCash proof submission + operator review queue
-6. PWA shell, icons, iOS install sheet, push + SMS (Semaphore)
+6. PWA shell, icons, iOS install sheet, SMS (Semaphore)
    + weather forecast on the booking screen (Open-Meteo, no API key needed)
 7. Reports, refunds, move-booking, reconciliation
 

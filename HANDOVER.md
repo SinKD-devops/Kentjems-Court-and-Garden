@@ -3,7 +3,7 @@
 Everything a new session needs to continue this project. Read this first, then
 [SPEC.md](SPEC.md) for the original design reasoning.
 
-Last updated: 28 August 2026.
+Last updated: 29 August 2026.
 
 Repo: `SinKD-devops/Kentjems-Court-and-Garden` (private)
 Live: `https://kentjems-court-and-garden.vercel.app` (Vercel project is named
@@ -27,8 +27,15 @@ both booked by the hour. Installable to the home screen on Android and iOS.
 Customers sign in by phone, request a time, and pay either at Kentjems Store in
 cash or online by InstaPay/GCash QR. One operator approves everything.
 
-**The owner is the only operator.** Phone `09958192317`. There is no second
-admin yet, which is a real risk — a lost SIM means nobody can approve payments.
+**Two operator accounts exist**, both with `role = 'operator'`: the owner on
+`09958192317` and Lordes Cubillas on `09502361590`, created 29 August 2026 as
+the recovery path — a single operator is one lost SIM away from being unable to
+approve payments. Neither can sign in until SMS works (§7.1), because OTP is
+the only way in.
+
+`profiles.is_backup_admin` is **not** the mechanism and grants nothing:
+`is_operator()` checks `role` alone, so the flag is read by no policy,
+view or function. Use `role = 'operator'`. See §9.
 
 ### The business rules that shape everything
 
@@ -54,8 +61,8 @@ console, and the PWA manifest and icons.
 
 **Blocked:** all SMS. See §7.
 
-**Never tested:** payment screenshot upload (needs a real file picker), PWA
-home-screen install, and push notifications on a real device.
+**Never tested:** payment screenshot upload (needs a real file picker) and PWA
+home-screen install. Both need a physical phone.
 
 ---
 
@@ -148,6 +155,35 @@ a variable name.
 
 Never floats. `formatPeso()` for screens, `smsPesos()` for SMS (see §4).
 
+### Notifications are SMS only
+
+Web push was removed on 29 August 2026. It had exactly one sender — the
+T-10-minute expiry reminder — while every event where money had moved already
+went out by SMS alone, so removing it cost one feature rather than a channel.
+The reminder was dropped rather than converted: SPEC estimated it at roughly a
+third of all message volume, which made it the most expensive notification in
+the system and the only one not tied to a payment. A customer who forgets now
+loses the slot without warning; the countdown is still on screen in `/my`.
+
+Gone with it: `web-push`, the VAPID variables, `push_subscriptions`,
+`expiry_reminded_at`, the `expiry-reminders` cron job and endpoint, and the
+service worker's push handlers. `public/sw.js` still caches the app shell and
+the offline page — that is unrelated and stays.
+
+### Payment screenshots are compressed in the browser
+
+`compressImage()` in `src/lib/image.ts` re-encodes a proof to a 1600px JPEG
+before upload — roughly 400 KB from a 3–8 MB screenshot. Mobile data in the
+Philippines is not free, and the operator only ever reads the reference number
+and amount off the image.
+
+Every failure path returns the **original file** rather than throwing. HEIC is
+the real case: Safari decodes it, most Android browsers do not, so those go up
+uncompressed. That is why the bucket cap is 10 MB rather than the ~1 MB a
+compressed proof needs — it is headroom for the undecodable, not the target.
+A proof that uploads slowly is a slow upload; a proof that cannot upload is a
+customer who has already sent money and cannot show it.
+
 ---
 
 ## 4. Traps found the hard way
@@ -181,9 +217,9 @@ language. It now reads *"Kentjems Court and Garden. Your number is 216220. It
 works for the next 5 minutes."*
 
 **A byte order mark can hide a variable.** PowerShell redirection wrote a BOM
-into `.env.local`, making the variable literally
-`\uFEFFNEXT_PUBLIC_VAPID_PUBLIC_KEY`. Nothing read it and nothing failed. The
-Vercel push script now refuses invalid names.
+into `.env.local`, making the variable literally `\uFEFF` + its name. Nothing
+read it and nothing failed. The Vercel push script now refuses invalid names.
+(It happened to a VAPID key, which no longer exists \u2014 the lesson does.)
 
 **Env vars only apply to new Vercel builds.** Adding them without redeploying
 changes nothing. Symptom: `{"error":"CRON_SECRET is not set."}` from
@@ -204,6 +240,14 @@ rejected for an unreadable screenshot could never resubmit a genuine payment.
 allows `postgres`/`service_role` through precisely so the first operator can be
 created; a customer session is never either.
 
+**`is_backup_admin` looks like a privilege and is not one.** The column is
+guarded by `guard_profile_privileges` as though it grants operator rights, and
+its own comment describes it as the second operator-capable account — but
+`is_operator()` selects on `role` alone, so no policy, view or function ever
+reads the flag. Setting it succeeds and grants nothing. The failure only
+surfaces the day someone flips it during a real lockout and finds the account
+still cannot approve a payment. Promote with `role = 'operator'`.
+
 **Latency:** ~1.7s TTFB. Vercel runs functions in Washington (`iad1`, fixed on
 the Hobby plan) while the database is in Seoul. Moving the database to
 **Singapore would make it worse** — the function-to-database hop gets longer.
@@ -217,7 +261,7 @@ with functions pinned to `icn1`. Accepted for now.
 ### Tables
 `spaces`, `profiles`, `bookings`, `payments`, `refunds`, `booking_moves`,
 `opening_hours`, `pricing_rules`, `closures`, `packages` (retired),
-`settings` (singleton), `availability_pulse`, `push_subscriptions`, `sms_log`,
+`settings` (singleton), `availability_pulse`, `sms_log`,
 `schema_migrations`
 
 ### Booking statuses
@@ -257,7 +301,6 @@ contested slot silently means walking to the store for a court that is gone.
 | Job | Schedule | What |
 |---|---|---|
 | `expire-stale-requests` | every minute | housekeeping only |
-| `expiry-reminders` | every minute | calls `/api/cron/expiry-reminders` |
 | `complete-past-bookings` | every 15 min | confirmed → completed |
 | `purge-proofs` | 03:15 Manila | calls `/api/cron/purge-proofs`, 90-day retention |
 | `sms-balance-check` | 08:00 Manila | calls `/api/cron/sms-balance`, warns below PHP 50 |
@@ -278,12 +321,10 @@ In `.env.local` (gitignored) and Vercel. `.env.example` lists the names.
 | `NEXT_PUBLIC_SUPABASE_URL` | Vercel type: Config, not secret |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Config — ships to browsers by design |
 | `NEXT_PUBLIC_SITE_URL` | Config — must be the real URL, not localhost |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Config |
 | `SUPABASE_SECRET_KEY` | secret — bypasses all RLS |
 | `SEMAPHORE_API_KEY` | secret |
 | `SEMAPHORE_API_URL` | `https://api.semaphore.co/api/v4` |
 | `SEMAPHORE_SENDER_NAME` | **empty — blocking, see §7** |
-| `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | secret |
 | `CRON_SECRET` | secret |
 | `DATABASE_URL` | **local only, never in Vercel** — superuser connection |
 
@@ -314,7 +355,7 @@ been removed from Vault — restoring it means re-running `npm run db:secrets`
 with the PhilSMS values and reverting migration 20260828002400.
 
 **2. Vercel has no environment variables.** Production runs without secrets, so
-no SMS and no push even once §7.1 is fixed. Check with:
+no SMS even once §7.1 is fixed. Check with:
 `curl -X POST https://kentjems-court-and-garden.vercel.app/api/cron/sms-balance`
 — `401` means secrets are present, `500` means missing. Fix with
 `vercel login && vercel link` then `npm run vercel:env`, **then redeploy**.
@@ -325,8 +366,8 @@ both pasted into a chat transcript.
 **4. Supabase free tier pauses after ~1 week idle.** A paused database means
 nobody can book, silently, on a quiet week. ~$25/month.
 
-**5. Untested paths** — screenshot upload, home-screen install, push on a real
-device. All need a physical phone.
+**5. Untested paths** — screenshot upload and home-screen install. Both need a
+physical phone.
 
 ---
 
@@ -361,6 +402,8 @@ because two translucent bars showed through each other.
 - Don't subscribe to `bookings` for realtime — use the pulse.
 - Don't trust an SMS provider's success response.
 - Don't put `₱` or a dash in an SMS.
+- Don't grant operator rights with `is_backup_admin` — nothing reads it.
+  Set `role = 'operator'`.
 - Do restart the dev server after touching `.env.local`.
 - Do run `npm test` — the concurrency and pricing tests are the ones that
   catch real breakage.

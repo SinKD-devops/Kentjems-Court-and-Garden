@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { submitProof } from "@/app/pay/[id]/actions";
 import { Countdown } from "@/components/Countdown";
+import { MAX_UPLOAD_BYTES, compressImage } from "@/lib/image";
 import { createSupabaseBrowser } from "@/lib/supabase/browser";
 import { formatPeso } from "@/lib/time";
 
@@ -46,11 +47,20 @@ export function PayForm({
 
       let proofPath: string | null = null;
       if (file) {
-        const extension = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+        const { blob, extension } = await compressImage(file);
+
+        // Checked here so an oversized proof fails with something a customer
+        // can act on, rather than an opaque storage error after the upload.
+        if (blob.size > MAX_UPLOAD_BYTES) {
+          throw new Error(
+            "That image is too large to send. Please take a screenshot rather than a photo of the screen.",
+          );
+        }
+
         proofPath = `${user.id}/${bookingId}.${extension}`;
         const { error: uploadError } = await supabase.storage
           .from("payment-proofs")
-          .upload(proofPath, file, { upsert: true });
+          .upload(proofPath, blob, { upsert: true, contentType: blob.type });
         if (uploadError) throw new Error(`Could not upload the screenshot: ${uploadError.message}`);
       }
 
