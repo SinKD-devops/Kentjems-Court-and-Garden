@@ -27,6 +27,8 @@ const secrets = [
   ["philsms_api_token", process.env.PHILSMS_API_TOKEN, "PhilSMS API token"],
   ["philsms_sender_id", process.env.PHILSMS_SENDER_ID, "PhilSMS sender ID"],
   ["philsms_api_url", process.env.PHILSMS_API_URL, "PhilSMS API base URL"],
+  ["app_url", process.env.NEXT_PUBLIC_SITE_URL, "Public app URL for scheduled jobs"],
+  ["cron_secret", process.env.CRON_SECRET, "Shared secret for cron endpoints"],
 ];
 
 const client = new pg.Client({ connectionString: DATABASE_URL });
@@ -49,7 +51,8 @@ try {
   const { rows } = await client.query(
     `select name, length(decrypted_secret) as len
      from vault.decrypted_secrets
-     where name like 'philsms%' order by name`,
+     where name in ('philsms_api_token','philsms_sender_id','philsms_api_url','app_url','cron_secret')
+     order by name`,
   );
   console.log("\nIn Vault:");
   for (const row of rows) console.log(`  ${row.name} (${row.len} chars)`);

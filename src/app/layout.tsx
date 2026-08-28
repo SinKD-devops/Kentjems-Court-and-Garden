@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Kentjems Court and Garden",
-  description: "Book the court by the hour or the garden for an event, in Cebu.",
+  description: "Book the court by the hour or the garden for an event, in Butuan City.",
   applicationName: "Kentjems",
   appleWebApp: {
     capable: true,

@@ -3,7 +3,7 @@
 -- ═══════════════════════════════════════════════════════════════════════
 
 -- ── where the venue is ─────────────────────────────────────────────────
--- Defaults to Cebu City. The operator should set the real coordinates in
+-- Defaults to Butuan City. The operator should set the exact coordinates in
 -- settings: a forecast for the wrong town is worse than none, because people
 -- will act on it.
 
@@ -12,8 +12,8 @@ alter table settings
   add column if not exists longitude numeric(9, 6);
 
 update settings
-set latitude  = coalesce(latitude, 10.315699),
-    longitude = coalesce(longitude, 123.885437)
+set latitude  = coalesce(latitude, 8.947500),
+    longitude = coalesce(longitude, 125.540600)
 where id;
 
 -- ── push subscriptions ─────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { withdrawRequest } from "@/app/book/actions";
 import { signOut } from "@/app/sign-in/actions";
 import { Countdown } from "@/components/Countdown";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { NotifyToggle } from "@/components/NotifyToggle";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { formatLongDate, formatPeso, formatTime } from "@/lib/time";
 
@@ -69,6 +70,10 @@ export default async function MyBookingsPage() {
         {/* Offered only once they have booked something — asking before that
             is how install prompts get dismissed for good. */}
         {rows.length > 0 && <InstallPrompt />}
+
+        {process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && live.some((b) => b.status === "requested") && (
+          <NotifyToggle publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY} />
+        )}
         {done.length > 0 && <Section title="Past">{done.map(Row)}</Section>}
 
         <form action={signOut} className="pt-2">
