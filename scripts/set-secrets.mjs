@@ -24,9 +24,9 @@ if (!DATABASE_URL) {
 }
 
 const secrets = [
-  ["philsms_api_token", process.env.PHILSMS_API_TOKEN, "PhilSMS API token"],
-  ["philsms_sender_id", process.env.PHILSMS_SENDER_ID, "PhilSMS sender ID"],
-  ["philsms_api_url", process.env.PHILSMS_API_URL, "PhilSMS API base URL"],
+  ["semaphore_api_key", process.env.SEMAPHORE_API_KEY, "Semaphore API key"],
+  ["semaphore_sender_name", process.env.SEMAPHORE_SENDER_NAME, "Semaphore sender name"],
+  ["semaphore_api_url", process.env.SEMAPHORE_API_URL, "Semaphore API base URL"],
   ["app_url", process.env.NEXT_PUBLIC_SITE_URL, "Public app URL for scheduled jobs"],
   ["cron_secret", process.env.CRON_SECRET, "Shared secret for cron endpoints"],
 ];
@@ -51,7 +51,7 @@ try {
   const { rows } = await client.query(
     `select name, length(decrypted_secret) as len
      from vault.decrypted_secrets
-     where name in ('philsms_api_token','philsms_sender_id','philsms_api_url','app_url','cron_secret')
+     where name in ('semaphore_api_key','semaphore_sender_name','semaphore_api_url','app_url','cron_secret')
      order by name`,
   );
   console.log("\nIn Vault:");

@@ -3,17 +3,19 @@ import "server-only";
 import { normalizePhPhone } from "@/lib/phone";
 
 /**
- * PhilSMS client.
+ * Semaphore SMS client.
  *
- * One provider for both OTP and booking notifications: one bill, one
- * deliverability profile to monitor, and one place to swap if rates change.
+ * Replaces PhilSMS, which delivered reliably to Globe and silently not at all
+ * to Smart and TNT — while still reporting "Delivered" and charging for every
+ * message. Four would-be customers requested a sign-in message and received
+ * nothing. Semaphore covers Globe, Smart, Sun and DITO.
  *
  * Anything where money has moved goes by SMS rather than push. Push needs the
- * app installed and notifications granted — and on iOS, added to the home
- * screen first. Someone who has paid must hear the outcome regardless.
+ * app installed and notifications granted, and on iOS the home screen too.
+ * Someone who has paid must hear the outcome regardless.
  */
 
-const API_URL = process.env.PHILSMS_API_URL ?? "https://dashboard.philsms.com/api/v3";
+const API_URL = process.env.SEMAPHORE_API_URL ?? "https://api.semaphore.co/api/v4";
 
 export interface SmsResult {
   ok: boolean;
@@ -21,21 +23,16 @@ export interface SmsResult {
 }
 
 /**
- * PhilSMS requires E.164. Numbers reach here in three shapes and none of them
- * are it: Supabase stores a signed-in customer's phone without the leading
- * plus ("639171234567"), walk-ins are typed at the counter in local form
- * ("0917 123 4567"), and only some callers pass "+63...".
- *
- * Normalising here rather than at each call site means a new caller cannot
- * reintroduce the bug by forgetting.
+ * Semaphore accepts local format, which is also what the operator types at the
+ * counter. Numbers arrive in three shapes — Supabase stores them without the
+ * leading plus, walk-ins are typed as 0917…, and some callers pass +63 — so
+ * they are normalised here rather than at each call site, where a new caller
+ * could reintroduce the bug by forgetting.
  */
-function toE164(raw: string): string {
-  const normalized = normalizePhPhone(raw);
-  if (normalized) return normalized;
-
-  // Not a Philippine mobile — pass it through, but never without the plus.
-  const digits = raw.replace(/[^\d]/g, "");
-  return digits.startsWith("+") ? digits : `+${digits}`;
+function toLocal(raw: string): string {
+  const e164 = normalizePhPhone(raw);
+  if (e164) return `0${e164.slice(3)}`;
+  return raw.replace(/[^\d]/g, "");
 }
 
 /**
@@ -66,46 +63,43 @@ export async function sendSms(
   message: string,
   kind = "unknown",
 ): Promise<SmsResult> {
-  const token = process.env.PHILSMS_API_TOKEN;
-  const senderId = process.env.PHILSMS_SENDER_ID;
+  const apikey = process.env.SEMAPHORE_API_KEY;
+  const sendername = process.env.SEMAPHORE_SENDER_NAME;
 
-  if (!token) {
-    const error = "PHILSMS_API_TOKEN is not set.";
+  if (!apikey) {
+    const error = "SEMAPHORE_API_KEY is not set.";
     await logSms(to, kind, false, error);
     return { ok: false, error };
   }
 
-  const recipient = toE164(to);
+  const recipient = toLocal(to);
+
+  const body = new URLSearchParams({
+    apikey,
+    number: recipient,
+    // Anything outside the GSM alphabet forces Unicode encoding, which cuts
+    // the limit from 160 characters to 70. Enforced here so no caller can
+    // slip one through.
+    message: gsmSafe(message),
+  });
+  if (sendername) body.set("sendername", sendername);
 
   try {
-    const response = await fetch(`${API_URL}/sms/send`, {
+    const response = await fetch(`${API_URL}/messages`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        recipient,
-        sender_id: senderId,
-        type: "plain",
-        // Anything outside the GSM alphabet forces Unicode encoding, which
-        // cuts the limit to 70 characters and is routed differently by some
-        // carriers. Enforced here so no caller can slip one through.
-        message: gsmSafe(message),
-      }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
     });
 
-    const body = (await response.json().catch(() => null)) as
-      | { status?: string; message?: string }
-      | null;
+    const payload = (await response.json().catch(() => null)) as unknown;
+    const failure = describeFailure(response.status, payload);
 
-    if (!response.ok || body?.status === "error") {
-      const detail = body?.message ?? `PhilSMS returned ${response.status}`;
-      console.error(`SMS to ${recipient} rejected: ${detail}`);
-      await logSms(recipient, kind, false, detail);
-      return { ok: false, error: detail };
+    if (failure) {
+      console.error(`SMS to ${recipient} rejected: ${failure}`);
+      await logSms(recipient, kind, false, failure);
+      return { ok: false, error: failure };
     }
+
     await logSms(recipient, kind, true);
     return { ok: true };
   } catch (error) {
@@ -115,18 +109,35 @@ export async function sendSms(
   }
 }
 
-export async function smsBalance(): Promise<string | null> {
-  const token = process.env.PHILSMS_API_TOKEN;
-  if (!token) return null;
+/**
+ * Semaphore answers 200 with an array of field errors on rejection — an
+ * unregistered sender name comes back that way, not as an HTTP error. Treating
+ * a 200 as success would mark undelivered messages as sent, which is exactly
+ * the failure mode we just spent a day chasing on the previous provider.
+ */
+function describeFailure(status: number, payload: unknown): string | null {
+  if (status >= 400) return `Semaphore returned ${status}`;
+  if (!Array.isArray(payload) || payload.length === 0) return "Semaphore returned no result";
 
-  const response = await fetch(`${API_URL}/balance`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
-  });
+  const first = payload[0] as Record<string, unknown>;
+  if (typeof first?.message_id === "number" || typeof first?.message_id === "string") return null;
+
+  const problems = Object.entries(first)
+    .map(([field, value]) => `${field}: ${Array.isArray(value) ? value.join(", ") : value}`)
+    .join("; ");
+
+  return problems || "Semaphore rejected the message";
+}
+
+export async function smsBalance(): Promise<string | null> {
+  const apikey = process.env.SEMAPHORE_API_KEY;
+  if (!apikey) return null;
+
+  const response = await fetch(`${API_URL}/account?apikey=${apikey}`, { cache: "no-store" });
   if (!response.ok) return null;
 
-  const body = (await response.json()) as { data?: { remaining_balance?: string } };
-  return body.data?.remaining_balance ?? null;
+  const body = (await response.json()) as { credit_balance?: number };
+  return body.credit_balance === undefined ? null : String(body.credit_balance);
 }
 
 /**
