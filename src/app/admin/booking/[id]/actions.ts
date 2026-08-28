@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { sendSms, smsCopy } from "@/lib/sms";
+import { sendSms, smsCopy, smsPesos } from "@/lib/sms";
 import { createSupabaseServer } from "@/lib/supabase/server";
-import { formatPeso, formatTime } from "@/lib/time";
+import { formatTime } from "@/lib/time";
 
 export interface BookingActionState {
   error?: string;
@@ -94,8 +94,9 @@ export async function refundBooking(
   if (result.phone) {
     const sent = await sendSms(
       result.phone,
-      `Kentjems: your ${result.space} booking on ${describe(result.starts_at, result.ends_at)} is cancelled (${reason}). ` +
-        `Collect your ${formatPeso(result.amount_centavos)} refund at Kentjems Store. Call ${support}.`,
+      `Kentjems Court and Garden. Your booking on ${describe(result.starts_at, result.ends_at)} ` +
+        `is cancelled because of ${reason}. Please collect your ` +
+        `${smsPesos(result.amount_centavos)} refund at Kentjems Store, or call ${support}.`,
       "refund-approved",
     );
     if (!sent.ok) console.error("Refund SMS failed:", sent.error);

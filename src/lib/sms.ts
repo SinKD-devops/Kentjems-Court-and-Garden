@@ -89,7 +89,10 @@ export async function sendSms(
         recipient,
         sender_id: senderId,
         type: "plain",
-        message,
+        // Anything outside the GSM alphabet forces Unicode encoding, which
+        // cuts the limit to 70 characters and is routed differently by some
+        // carriers. Enforced here so no caller can slip one through.
+        message: gsmSafe(message),
       }),
     });
 
@@ -99,7 +102,7 @@ export async function sendSms(
 
     if (!response.ok || body?.status === "error") {
       const detail = body?.message ?? `PhilSMS returned ${response.status}`;
-      console.error(`SMS to  rejected: `);
+      console.error(`SMS to ${recipient} rejected: ${detail}`);
       await logSms(recipient, kind, false, detail);
       return { ok: false, error: detail };
     }
@@ -127,34 +130,68 @@ export async function smsBalance(): Promise<string | null> {
 }
 
 /**
+ * Peso amounts for SMS.
+ *
+ * "PHP" rather than the peso sign, because that character is not in the GSM
+ * alphabet. One of them forces the whole message into Unicode encoding, which
+ * cuts the limit from 160 characters to 70 and routes differently on some
+ * carriers.
+ */
+export function smsPesos(centavos: number): string {
+  const pesos = centavos / 100;
+  return `PHP ${Number.isInteger(pesos) ? pesos : pesos.toFixed(2)}`;
+}
+
+/**
+ * Strips anything outside the GSM alphabet.
+ *
+ * Curly quotes, en dashes and the peso sign all creep in from copy written for
+ * the screen, and each one silently doubles the cost of a message and halves
+ * its length budget.
+ */
+export function gsmSafe(text: string): string {
+  return text
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/₱/g, "PHP ")
+    .replace(/…/g, "...");
+}
+
+/**
  * Message copy.
  *
- * Each one has to stand on its own — a customer reading this on the lock
- * screen should not need to open the app to know where they stand. Rejections
- * always carry a number to call: the person believes they paid, and being
- * told no with no way to reply is how this becomes a public complaint.
+ * Written to survive Philippine carrier filtering, which is aggressive about
+ * anything resembling a scam or a marketing blast. So: no "code", "OTP",
+ * "verify", "PIN" or "password"; no links; no shouting in capitals; no
+ * urgency language. Plain sentences that read like a person wrote them.
+ *
+ * Each one still has to stand on its own — someone reading it on a lock screen
+ * should know where they stand without opening the app. Rejections always
+ * carry a number to call: the person believes they paid, and being told no
+ * with no way to reply is how this becomes a public complaint.
  */
 export const smsCopy = {
   approved: (space: string, when: string, reference: string) =>
-    `Kentjems: PAID. ${space}, ${when}. Ref ${reference}. See you there.`,
+    `Kentjems Court and Garden. Your booking is confirmed for ${space}, ${when}. Reference ${reference}. See you there.`,
 
   rejected: (reason: string, support: string) =>
-    `Kentjems: payment not accepted (${reason}). Slot released. Call ${support}.`,
+    `Kentjems Court and Garden. We could not match your payment (${reason}), so that time is open again. Please call ${support} and we will sort it out.`,
 
   confirmedAtCounter: (space: string, when: string) =>
-    `Kentjems: PAID. ${space}, ${when}. See you there.`,
+    `Kentjems Court and Garden. Your booking is confirmed for ${space}, ${when}. See you there.`,
 
   superseded: (space: string, when: string) =>
-    `Kentjems: someone paid for ${space} ${when} first, so your request is cancelled. Please pick another time.`,
+    `Kentjems Court and Garden. Someone paid for ${space} on ${when} ahead of you, so that time is taken. Please pick another and we will hold it for you.`,
 
   moved: (space: string, from: string, to: string) =>
-    `Kentjems: your ${space} booking moved from ${from} to ${to}. Sorry for the change.`,
+    `Kentjems Court and Garden. Your ${space} booking has moved from ${from} to ${to}. Sorry for the change.`,
 
   /**
-   * To the operator, not the customer. Carries enough to judge urgency from
-   * the lock screen — which slot is now held, for how much, and the reference
-   * to check against the real GCash history.
+   * To the operator, not the customer. Enough to judge urgency from a lock
+   * screen: which slot is now held, for how much, and the reference to check
+   * against the real payment history.
    */
   proofToReview: (space: string, when: string, price: string, reference: string) =>
-    `Kentjems: payment to verify. ${space} ${when}, ${price}. Ref ${reference}. The slot is held until you approve it.`,
+    `Kentjems Court and Garden. A payment is waiting for you to check: ${space} ${when}, ${price}, reference ${reference}. That time is held until you approve it.`,
 };

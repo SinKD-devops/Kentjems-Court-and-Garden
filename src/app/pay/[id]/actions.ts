@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { sendSms, smsCopy } from "@/lib/sms";
+import { sendSms, smsCopy, smsPesos } from "@/lib/sms";
 import { createReadClient, createSupabaseServer } from "@/lib/supabase/server";
-import { formatPeso, formatTime } from "@/lib/time";
+import { formatTime } from "@/lib/time";
 
 export interface ProofState {
   error?: string;
@@ -78,7 +78,7 @@ async function alertOperator(bookingId: string, reference: string) {
     const message = smsCopy.proofToReview(
       spaceName ?? "Court",
       when,
-      formatPeso(row.price_centavos),
+      smsPesos(row.price_centavos),
       reference,
     );
 
