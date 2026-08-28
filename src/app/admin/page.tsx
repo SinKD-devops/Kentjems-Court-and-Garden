@@ -178,22 +178,25 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
           ) : (
             <ul className="flex flex-col gap-1.5">
               {confirmed.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3.5 py-2.5"
-                >
-                  <div className="min-w-0">
-                    <p className="text-[13.5px] font-bold tabular-nums">
-                      {formatTime(row.starts_at)} – {formatTime(row.ends_at)}
-                    </p>
-                    <p className="truncate text-[11.5px] font-medium text-soft">
-                      {row.space_name} · {row.contact_name || row.contact_phone || "—"}
-                      {row.source === "walk_in" && " · walk-in"}
-                    </p>
-                  </div>
-                  <span className="flex-none rounded-full bg-tint px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-green-deep">
-                    Paid
-                  </span>
+                <li key={row.id}>
+                  {/* Tapping a booking is how you reach move and refund. */}
+                  <Link
+                    href={`/admin/booking/${row.id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3.5 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-bold tabular-nums">
+                        {formatTime(row.starts_at)} – {formatTime(row.ends_at)}
+                      </p>
+                      <p className="truncate text-[11.5px] font-medium text-soft">
+                        {row.space_name} · {row.contact_name || row.contact_phone || "—"}
+                        {row.source === "walk_in" && " · walk-in"}
+                      </p>
+                    </div>
+                    <span className="flex-none rounded-full bg-tint px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.04em] text-green-deep">
+                      Paid
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>

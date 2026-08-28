@@ -6,7 +6,7 @@
 insert into spaces (slug, name, mode, advance_days, max_open_requests, sort_order)
 values
   ('court',  'Court',  'hourly',   7, 1, 0),
-  ('garden', 'Garden', 'package', 30, 1, 1)
+  ('garden', 'Garden', 'hourly',  30, 1, 1)
 on conflict (slug) do update
   set name              = excluded.name,
       mode              = excluded.mode,
@@ -28,19 +28,18 @@ select id, null::integer, '06:00'::time, '24:00'::time from spaces where slug in
 --   Evening  18:00–24:00  →  PHP 100  ( 6 slots: 6pm through the 11pm start)
 -- Boundaries are half-open [start, end) so 17:59 is day and 18:00 is evening.
 
-delete from pricing_rules where space_id = (select id from spaces where slug = 'court');
+delete from pricing_rules where space_id in (select id from spaces where slug in ('court','garden'));
 
 insert into pricing_rules (space_id, day_of_week, starts_at_time, ends_at_time, price_centavos, label)
 select id, null::integer, '06:00'::time, '18:00'::time,  6000, 'Daytime' from spaces where slug = 'court'
 union all
-select id, null::integer, '18:00'::time, '24:00'::time, 10000, 'Evening' from spaces where slug = 'court';
+select id, null::integer, '18:00'::time, '24:00'::time, 10000, 'Evening' from spaces where slug = 'court'
+union all
+select id, null::integer, '06:00'::time, '18:00'::time, 25000, 'Daytime' from spaces where slug = 'garden'
+union all
+select id, null::integer, '18:00'::time, '24:00'::time, 35000, 'Evening' from spaces where slug = 'garden';
 
--- ── garden packages ────────────────────────────────────────────────────
--- The operator adds more of these in admin. This is the first real one.
-
-insert into packages (space_id, name, duration_minutes, price_centavos, sort_order)
-select id, 'Birthday', 240, 75000, 0 from spaces where slug = 'garden'
-on conflict do nothing;
+-- Packages are retired: the garden is booked by the hour like the court.
 
 -- ── settings ───────────────────────────────────────────────────────────
 

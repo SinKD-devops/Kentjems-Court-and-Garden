@@ -162,10 +162,42 @@ describe.skipIf(!DATABASE_URL)("request_booking", () => {
     ).rejects.toThrow(/closed at that time/i);
   });
 
-  it("refuses hourly requests against the garden", async () => {
+  it("books the garden by the hour at its own rates", async () => {
+    const rows = await asUser<{ request_booking: string }>(
+      userId,
+      "select request_booking('garden', $1::timestamptz, true, 1)",
+      [slotIn(1, 19)],
+    );
+    const { rows: booking } = await db.query(
+      "select price_centavos from bookings where id = $1",
+      [rows[0].request_booking],
+    );
+    expect(booking[0].price_centavos).toBe(35000); // PHP 350 evening
+  });
+
+  it("prices the garden daytime at PHP 250", async () => {
+    const rows = await asUser<{ request_booking: string }>(
+      userId,
+      "select request_booking('garden', $1::timestamptz, true, 1)",
+      [slotIn(1, 9)],
+    );
+    const { rows: booking } = await db.query(
+      "select price_centavos from bookings where id = $1",
+      [rows[0].request_booking],
+    );
+    expect(booking[0].price_centavos).toBe(25000);
+  });
+
+  it("keeps the open-request limit per space, not overall", async () => {
+    // A pending garden booking must never block a court booking.
+    await asUser(userId, "select request_booking('court', $1::timestamptz, true, 1)", [
+      slotIn(1, 9),
+    ]);
     await expect(
-      asUser(userId, "select request_booking('garden', $1::timestamptz, true)", [slotIn(1, 19)]),
-    ).rejects.toThrow(/packages, not hourly/i);
+      asUser(userId, "select request_booking('garden', $1::timestamptz, true, 1)", [
+        slotIn(1, 9),
+      ]),
+    ).resolves.toBeTruthy();
   });
 
   it("refuses anonymous callers", async () => {

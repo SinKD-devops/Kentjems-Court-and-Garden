@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:push": "node scripts/db.mjs push",
     "db:seed": "node scripts/db.mjs seed",
-    "db:secrets": "node scripts/set-secrets.mjs"
+    "db:secrets": "node scripts/set-secrets.mjs",
+    "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",
@@ -21,7 +22,6 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.34.0",
     "next": "16.3.3",
-    "next-intl": "^4.14.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
@@ -38,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "pg": "^8.23.0",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.11"
