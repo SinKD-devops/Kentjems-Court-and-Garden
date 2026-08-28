@@ -329,6 +329,77 @@ describe.skipIf(!DATABASE_URL)("availability pulse", () => {
   });
 });
 
+describe.skipIf(!DATABASE_URL)("superseding the losers", () => {
+  /**
+   * The people who lose a contested slot have to be told. Their request cost
+   * them nothing, so without a message their only feedback is walking to the
+   * store to pay for a court that is already gone.
+   */
+  async function raceAndConfirm(confirmFn: string) {
+    const slot = slotIn(1, 16);
+
+    const winner = await asUser<{ request_booking: string }>(
+      userId,
+      "select request_booking('court', $1::timestamptz, true, 1)",
+      [slot],
+    );
+    await asUser(otherId, "select request_booking('court', $1::timestamptz, true, 1)", [slot]);
+
+    await db.query("update profiles set role = 'operator' where id = $1", [userId]);
+    if (confirmFn === "approve_payment") {
+      await db.query(
+        `insert into payments (booking_id, method, amount_centavos, reference_number, status)
+         values ($1, 'gcash', 6000, $2, 'pending')`,
+        [winner[0].request_booking, `ref-${Date.now()}`],
+      );
+      await db.query("update bookings set status = 'proof_submitted' where id = $1", [
+        winner[0].request_booking,
+      ]);
+    }
+
+    const result = await asUser<{ [k: string]: unknown }>(
+      userId,
+      `select ${confirmFn}($1) as r`,
+      [winner[0].request_booking],
+    );
+
+    await db.query("update profiles set role = 'customer' where id = $1", [userId]);
+    return result[0].r as { space: string; superseded: { phone: string }[] };
+  }
+
+  it("returns who lost the slot when a payment is approved", async () => {
+    const result = await raceAndConfirm("approve_payment");
+    expect(result.space).toBe("Court");
+    expect(result.superseded).toHaveLength(1);
+    expect(result.superseded[0].phone).toBe(OTHER_PHONE);
+  });
+
+  it("does the same when cash is taken at the counter", async () => {
+    const result = await raceAndConfirm("confirm_cash_payment");
+    expect(result.superseded).toHaveLength(1);
+    expect(result.superseded[0].phone).toBe(OTHER_PHONE);
+  });
+
+  it("records the cash payment against the booking", async () => {
+    await raceAndConfirm("confirm_cash_payment");
+    const { rows } = await db.query(
+      "select method, status from payments where method = 'cash' order by submitted_at desc limit 1",
+    );
+    expect(rows[0]).toMatchObject({ method: "cash", status: "approved" });
+  });
+
+  it("refuses to let a customer confirm their own payment", async () => {
+    const rows = await asUser<{ request_booking: string }>(
+      userId,
+      "select request_booking('court', $1::timestamptz, true, 1)",
+      [slotIn(1, 8)],
+    );
+    await expect(
+      asUser(userId, "select confirm_cash_payment($1)", [rows[0].request_booking]),
+    ).rejects.toThrow(/only the operator/i);
+  });
+});
+
 describe.skipIf(!DATABASE_URL)("row level security", () => {
   it("hides one customer's bookings from another", async () => {
     await asUser(userId, "select request_booking('court', $1::timestamptz, true)", [
