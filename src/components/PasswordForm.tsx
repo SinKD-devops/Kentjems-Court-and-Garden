@@ -6,7 +6,7 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 const initial: PasswordState = {};
 
-export function PasswordForm() {
+export function PasswordForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState(setPassword, initial);
 
   if (state.done) {
@@ -20,6 +20,8 @@ export function PasswordForm() {
 
   return (
     <form action={action} className="flex flex-col gap-3">
+      {next && <input type="hidden" name="next" value={next} />}
+
       <label className="flex flex-col gap-1.5">
         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-faint">
           New password

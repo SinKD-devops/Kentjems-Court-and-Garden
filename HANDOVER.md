@@ -168,6 +168,17 @@ dependency has moved from *every* sign-in to *once per customer, ever* — it is
 not gone. During an SMS outage an existing customer can still get in; a brand
 new one cannot self-register, and has to be created at the counter.
 
+**The offer comes at account creation, not later.** Verifying a code checks
+`profiles.password_set_at`; if it is null the customer lands on `/account?first=1`
+before going anywhere else. A fallback set after the first outage is a fallback
+that was missing when it mattered.
+
+It is **skippable on purpose**. Someone reaches that screen mid-booking, with a
+slot they want and a request that expires in thirty minutes. Standing between
+them and the court to enforce a fallback would cost the booking the app exists
+to take. If adoption turns out to be poor, ask again later rather than blocking
+here.
+
 **Recovery is the counter, not an email.** Forgotten password → sign in with a
 code and set a new one at `/account`. If texts are not arriving at all, that
 route is closed too, so the operator resets it with the admin API — verified

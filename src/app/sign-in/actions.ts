@@ -34,7 +34,7 @@ export async function verifyCode(_prev: AuthState, form: FormData): Promise<Auth
   }
 
   const supabase = await createSupabaseServer();
-  const { error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
+  const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
 
   if (error) {
     return {
@@ -44,6 +44,25 @@ export async function verifyCode(_prev: AuthState, form: FormData): Promise<Auth
           ? "That code is wrong or has expired. Ask for a new one."
           : error.message,
     };
+  }
+
+  // Offer a password at the moment the account comes into existence, rather
+  // than leaving it on a screen nobody visits. A fallback set after the first
+  // outage is a fallback that was missing when it mattered.
+  //
+  // Read with the caller's own session: RLS limits profiles to their owner, so
+  // the anonymous client would return nothing here and everyone would be
+  // offered the screen forever (§4).
+  if (data.user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("password_set_at")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (!profile?.password_set_at) {
+      redirect(`/account?first=1&next=${encodeURIComponent(next)}`);
+    }
   }
 
   redirect(next);

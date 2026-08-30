@@ -43,5 +43,16 @@ export async function setPassword(
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };
 
+  // Stamped after the password actually changed, never before. If this write
+  // fails the customer simply gets offered the screen again next time, which
+  // is the harmless direction to fail in.
+  await supabase
+    .from("profiles")
+    .update({ password_set_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  const next = String(form.get("next") ?? "");
+  if (next.startsWith("/")) redirect(next);
+
   return { done: true };
 }
