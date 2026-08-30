@@ -3,7 +3,7 @@
 Everything a new session needs to continue this project. Read this first, then
 [SPEC.md](SPEC.md) for the original design reasoning.
 
-Last updated: 29 August 2026.
+Last updated: 30 August 2026.
 
 Repo: `SinKD-devops/Kentjems-Court-and-Garden` (private)
 Live: `https://kentjems-court-and-garden.vercel.app` (Vercel project is named
@@ -354,11 +354,28 @@ PhilSMS credit (~PHP 260) is still alive as a fallback, but its secrets have
 been removed from Vault — restoring it means re-running `npm run db:secrets`
 with the PhilSMS values and reverting migration 20260828002400.
 
-**2. Vercel has no environment variables.** Production runs without secrets, so
-no SMS even once §7.1 is fixed. Check with:
+**2. Vercel environment — mostly resolved, but the deploy is stale.** Checked
+30 August 2026:
 `curl -X POST https://kentjems-court-and-garden.vercel.app/api/cron/sms-balance`
-— `401` means secrets are present, `500` means missing. Fix with
-`vercel login && vercel link` then `npm run vercel:env`, **then redeploy**.
+returns `401`, not `500`, so `CRON_SECRET` is set. The live site also renders
+real availability, which means the public Supabase variables are baked into the
+build. **Not proven by either check:** `SEMAPHORE_API_KEY` and
+`SUPABASE_SECRET_KEY`, and whether any of them were updated after the
+credential rotation.
+
+What is still outstanding is the **deploy**, not the variables. A `git push` to
+`main` does **not** trigger a build — there is no GitHub auto-deploy on this
+project, confirmed by `/api/cron/expiry-reminders` still answering `401` after
+its route was deleted and pushed. Deploy by hand:
+
+```bash
+vercel login && vercel link && vercel --prod
+```
+
+Until that runs, the deployed code is older than both the repository and the
+database — the schema has already dropped the push objects while the live build
+still contains the route that used them. Harmless only because the `pg_cron`
+job that called it is unscheduled, so nothing invokes it.
 
 **3. Rotate credentials.** The database password and Supabase secret key were
 both pasted into a chat transcript.
