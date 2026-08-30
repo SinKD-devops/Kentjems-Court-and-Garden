@@ -186,10 +186,23 @@ Signing in **with a password** stamps the column if it is null. Without that, an
 operator whose password was set from the Supabase dashboard would be marched to
 a screen telling them to set the one they had just used.
 
-The cost is accepted deliberately: someone reaches this mid-booking with a slot
-they want and a request that expires in thirty minutes, and some of them will
-leave. That was weighed against being unable to trade during an SMS outage, and
-the outage won.
+The cost is accepted deliberately, and the arithmetic favours it more than it
+first appears. Yes, this lands mid-booking on someone with a slot they want and
+a thirty-minute expiry, and some will leave. But it is paid **once per customer,
+ever**, while the return arrives on every later booking — and this is a
+neighbourhood court whose customers come back weekly, not a shop full of
+strangers. The friction does not recur; the benefit does.
+
+Three things it buys, not one:
+
+- **Resilience.** An SMS outage no longer stops an existing customer booking.
+- **Speed.** A returning customer signs in immediately instead of waiting on a
+  text — the second sign-in onward is faster than it ever was.
+- **Money.** Every password sign-in is an SMS not sent. A code was previously
+  required for *every* login, so a weekly customer cost roughly four messages a
+  month in sign-ins alone. At PHP 0.50 each that is real against SPEC's
+  PHP 525–700 estimate, and it grows with the customer base rather than with
+  occupancy.
 
 **Recovery is the counter, not an email.** Forgotten password → sign in with a
 code and set a new one at `/account`. If texts are not arriving at all, that
