@@ -97,7 +97,19 @@ export async function signInWithPassword(
   }
 
   const supabase = await createSupabaseServer();
-  const { error } = await supabase.auth.signInWithPassword({ phone, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
+
+  if (!error && data.user) {
+    // Signing in this way is proof a password exists, whatever the column
+    // says. Stamping it here stops an operator whose password was set from the
+    // Supabase dashboard being marched to a screen telling them to set the one
+    // they just used.
+    await supabase
+      .from("profiles")
+      .update({ password_set_at: new Date().toISOString() })
+      .eq("id", data.user.id)
+      .is("password_set_at", null);
+  }
 
   if (error) {
     // Deliberately does not distinguish "no such number" from "wrong

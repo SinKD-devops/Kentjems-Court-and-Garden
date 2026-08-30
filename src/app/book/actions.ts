@@ -54,6 +54,21 @@ export async function createRequest(
     if (nameError) return { error: nameError.message };
   }
 
+  // The real gate. The /book page redirects anyone without a password, but a
+  // form can be submitted without ever loading that page, and "required"
+  // enforced only by a missing button is not required at all.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("password_set_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!profile?.password_set_at) {
+    redirect(
+      `/account?first=1&next=${encodeURIComponent(`/book?space=${space}&start=${startsAt}&hours=${hours}`)}`,
+    );
+  }
+
   const { error } = await supabase.rpc("request_booking", {
     p_space_slug: space,
     p_starts_at: startsAt,

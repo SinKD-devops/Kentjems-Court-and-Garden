@@ -35,30 +35,17 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
       <main className="flex flex-1 flex-col gap-4 px-4 pt-4">
         <p className="text-[12.5px] leading-relaxed text-soft">
           {first
-            ? "Set a password now and you can sign in even when a text does not arrive. It takes a moment, and it is the difference between booking a court and waiting for a code that may not come."
+            ? "Choose a password before you book. Texts do not always arrive, and this is what lets you sign in when one does not — so you are never locked out of a court you have paid for."
             : "Setting a password lets you sign in straight away instead of waiting for a text. Codes keep working — this is an extra way in, not a replacement."}
         </p>
 
         <PasswordForm next={first ? next : undefined} />
 
-        {first ? (
-          // Skippable on purpose. Someone reaches this screen mid-booking, with
-          // a slot they want and a request that expires in thirty minutes;
-          // standing between them and the court to enforce a fallback would
-          // cost the booking this app exists to take.
-          <Link
-            href={next}
-            className="text-center text-[13px] font-semibold text-soft"
-          >
-            Skip for now
-          </Link>
-        ) : (
-          <p className="px-1 text-[11.5px] leading-relaxed text-soft">
-            Forgotten it later? Sign in with a code and set a new one here. If texts are
-            not arriving at all, ask at Kentjems Store and the operator can reset it for
-            you.
-          </p>
-        )}
+        <p className="px-1 text-[11.5px] leading-relaxed text-soft">
+          {first
+            ? "You only do this once. Forget it later and you can sign in with a code and set a new one — or ask at Kentjems Store and the operator will reset it."
+            : "Forgotten it later? Sign in with a code and set a new one here. If texts are not arriving at all, ask at Kentjems Store and the operator can reset it for you."}
+        </p>
       </main>
     </div>
   );

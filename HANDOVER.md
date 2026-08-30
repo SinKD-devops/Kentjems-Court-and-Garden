@@ -168,16 +168,28 @@ dependency has moved from *every* sign-in to *once per customer, ever* — it is
 not gone. During an SMS outage an existing customer can still get in; a brand
 new one cannot self-register, and has to be created at the counter.
 
-**The offer comes at account creation, not later.** Verifying a code checks
-`profiles.password_set_at`; if it is null the customer lands on `/account?first=1`
-before going anywhere else. A fallback set after the first outage is a fallback
-that was missing when it mattered.
+**A password is required, at account creation.** Verifying a code checks
+`profiles.password_set_at`; if it is null the customer lands on
+`/account?first=1` before going anywhere else, with no way past it. A fallback
+set after the first outage is a fallback that was missing when it mattered.
 
-It is **skippable on purpose**. Someone reaches that screen mid-booking, with a
-slot they want and a request that expires in thirty minutes. Standing between
-them and the court to enforce a fallback would cost the booking the app exists
-to take. If adoption turns out to be poor, ask again later rather than blocking
-here.
+Enforced in **three** places, because a screen with the button removed is still
+walked away from with the back button:
+
+| Where | Why |
+|---|---|
+| After `verifyOtp` | The normal path — offered the moment the account exists |
+| `/book` page load | Backstop. Rides on the profile read already there, so it costs no round trip |
+| `createRequest` action | The real gate. A form can be posted without ever loading `/book` |
+
+Signing in **with a password** stamps the column if it is null. Without that, an
+operator whose password was set from the Supabase dashboard would be marched to
+a screen telling them to set the one they had just used.
+
+The cost is accepted deliberately: someone reaches this mid-booking with a slot
+they want and a request that expires in thirty minutes, and some of them will
+leave. That was weighed against being unable to trade during an SMS outage, and
+the outage won.
 
 **Recovery is the counter, not an email.** Forgotten password → sign in with a
 code and set a new one at `/account`. If texts are not arriving at all, that

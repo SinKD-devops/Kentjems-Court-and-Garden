@@ -50,10 +50,19 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
     createReadClient().from("settings").select("support_numbers").single(),
     session
       .from("profiles")
-      .select("accepted_terms_at, full_name")
+      .select("accepted_terms_at, full_name, password_set_at")
       .eq("id", user!.id)
       .single(),
   ]);
+
+  // A password is required before booking. The offer after sign-in is the
+  // normal path; this is the backstop, because a screen you can walk away from
+  // with the back button is not actually required. Costs nothing — it rides on
+  // the profile read above rather than adding a round trip.
+  if (!profile?.password_set_at) {
+    const back = `/book?space=${spaceSlug}&start=${encodeURIComponent(start)}&hours=${hours}`;
+    redirect(`/account?first=1&next=${encodeURIComponent(back)}`);
+  }
 
   // Any hour in the range being gone kills the whole booking — it is one
   // continuous session, not a set of independent hours.
