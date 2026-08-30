@@ -51,6 +51,13 @@ export async function setPassword(
     .update({ password_set_at: new Date().toISOString() })
     .eq("id", user.id);
 
+  // Ends every other session on every other device, keeping this one alive.
+  //
+  // Someone changing a password because they think another person has it
+  // gains nothing if that person's session simply carries on. A shared phone
+  // in a household is the ordinary case here, not an attack.
+  await supabase.auth.signOut({ scope: "others" });
+
   const next = String(form.get("next") ?? "");
   if (next.startsWith("/")) redirect(next);
 

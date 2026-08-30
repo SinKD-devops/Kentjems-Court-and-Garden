@@ -80,12 +80,26 @@ function PasswordSignIn({ next }: { next: string }) {
         </button>
       </form>
 
-      <Link
-        href={`/sign-in?next=${encodeURIComponent(next)}`}
-        className="text-center text-[13px] font-semibold text-soft"
-      >
-        Text me a code instead
-      </Link>
+      <div className="flex flex-col gap-2">
+        <Link
+          href={`/sign-in?next=${encodeURIComponent(next)}`}
+          className="text-center text-[13px] font-semibold text-soft"
+        >
+          Text me a code instead
+        </Link>
+
+        {/* Recovery is the code path, so this is not a separate flow to build
+            and maintain — it is the ordinary sign-in with somewhere else to
+            land. `next` is dropped on purpose: someone who has forgotten their
+            password should finish on the screen that sets a new one, not be
+            bounced onward to a booking with the problem unfixed. */}
+        <Link
+          href="/sign-in?next=%2Faccount"
+          className="text-center text-[13px] font-semibold text-green"
+        >
+          Forgotten your password?
+        </Link>
+      </div>
     </div>
   );
 }
