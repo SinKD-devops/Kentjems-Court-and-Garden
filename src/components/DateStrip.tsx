@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DateChipContent } from "@/components/DateChipContent";
 import type { DateKey } from "@/lib/time";
 import { formatDayNumber, formatWeekday, todayKey } from "@/lib/time";
 
@@ -49,17 +50,11 @@ export function DateStrip({
                     : "border-line bg-surface text-ink",
                 ].join(" ")}
               >
-                <span
-                  className={[
-                    "text-[9px] font-semibold uppercase tracking-[0.06em]",
-                    active ? "text-white/80" : "text-faint",
-                  ].join(" ")}
-                >
-                  {date === today ? "Today" : formatWeekday(date)}
-                </span>
-                <span className="text-[15px] font-bold tabular-nums">
-                  {formatDayNumber(date)}
-                </span>
+                <DateChipContent
+                  weekday={date === today ? "Today" : formatWeekday(date)}
+                  day={formatDayNumber(date)}
+                  active={active}
+                />
               </Link>
             </li>
           );

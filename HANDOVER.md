@@ -275,11 +275,24 @@ reads the flag. Setting it succeeds and grants nothing. The failure only
 surfaces the day someone flips it during a real lockout and finds the account
 still cannot approve a payment. Promote with `role = 'operator'`.
 
-**Latency:** ~1.7s TTFB. Vercel runs functions in Washington (`iad1`, fixed on
-the Hobby plan) while the database is in Seoul. Moving the database to
-**Singapore would make it worse** — the function-to-database hop gets longer.
-The free fix is moving the database to **US East**; the paid fix is Vercel Pro
-with functions pinned to `icn1`. Accepted for now.
+**Latency:** measured 30 August 2026 — **2.0–4.1s TTFB in production**, 0.4–0.6s
+warm on localhost. The older "~1.7s" figure in this document was optimistic.
+Vercel runs functions in Washington (`iad1`, fixed on the Hobby plan) while the
+database is in Seoul. Moving the database to **Singapore would make it worse** —
+the function-to-database hop gets longer. The free fix is moving the database to
+**US East**; the paid fix is Vercel Pro with functions pinned to `icn1`.
+Accepted for now.
+
+**Changing date feels slow, and two separate things cause it.** The wait is
+real: the grid is never cached, so every date is a fresh server render against
+Seoul. Two sequential round trips remain — `listSpaces()` and then the
+availability batch. What made it feel broken rather than slow was that nothing
+moved for those seconds; the date chips now pulse while their own navigation is
+in flight (`useLinkStatus`, `src/components/DateChipContent.tsx`).
+
+Do not "fix" the remaining wait by prefetching or caching the grid. A prefetched
+date is availability fetched seconds early, which is the stale grid §3 exists to
+prevent.
 
 ---
 

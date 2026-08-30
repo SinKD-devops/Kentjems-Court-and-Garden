@@ -155,11 +155,13 @@ export async function getDayAvailability(
   const dayEnd = endOfDay(date);
   const dow = dayOfWeek(date);
 
-  // Fetched alongside availability rather than after it: the forecast is an
-  // outside service and must not add a sequential round trip to page load.
-  const forecast = await getForecastFor(supabase, date);
-
-  const [hours, pricing, packages, live, demand, closures] = await Promise.all([
+  // Fetched alongside availability rather than before it. The forecast reads
+  // settings and then calls an outside service, so awaiting it on its own line
+  // put two sequential round trips in front of every date change — which is
+  // what this comment already claimed it did not. Keep it inside the
+  // Promise.all: a slow weather service must never hold up the slot grid.
+  const [forecast, hours, pricing, packages, live, demand, closures] = await Promise.all([
+    getForecastFor(supabase, date),
     supabase
       .from("opening_hours")
       .select("day_of_week, opens_at, closes_at")
