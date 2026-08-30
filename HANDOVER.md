@@ -155,6 +155,36 @@ a variable name.
 
 Never floats. `formatPeso()` for screens, `smsPesos()` for SMS (see §4).
 
+### Two ways in: a code, or a password
+
+Added 30 August 2026, because SMS is a third party that has already failed this
+project once. A customer can sign in with a texted code (the default) or with a
+password they have set.
+
+**Registering still needs one code.** A password cannot be the first thing an
+account has: a phone number nobody has verified is a number anybody could
+claim, and whoever claimed it would receive that person's bookings. So the SMS
+dependency has moved from *every* sign-in to *once per customer, ever* — it is
+not gone. During an SMS outage an existing customer can still get in; a brand
+new one cannot self-register, and has to be created at the counter.
+
+**Recovery is the counter, not an email.** Forgotten password → sign in with a
+code and set a new one at `/account`. If texts are not arriving at all, that
+route is closed too, so the operator resets it with the admin API — verified
+working. This is the only escape from an otherwise circular fallback: a
+password whose reset path is the very channel it exists to survive.
+
+**The wrong-credentials message is vague on purpose.** It never says whether
+the number has an account. Philippine mobile numbers are `09` plus nine digits,
+so the usernames are enumerable; a precise error turns the sign-in form into a
+way to ask who is a customer here.
+
+Rules live in `src/lib/password.ts` — eight characters, and not the phone
+number. **Real strength enforcement is a Supabase dashboard setting**, not
+code: leaked-password checking against HaveIBeenPwned and a project-wide
+minimum, under Authentication → Policies. Until those are on, nothing stops
+`password123`. See §7.
+
 ### Notifications are SMS only
 
 Web push was removed on 29 August 2026. It had exactly one sender — the
@@ -384,8 +414,20 @@ the database functions) matches.
 all rejected. The owner was applying for one. When approved: put it in
 `.env.local` as `SEMAPHORE_SENDER_NAME`, run `npm run db:secrets`, add it to
 Vercel, then test delivery to a **Smart/TNT** number (09635483047), not just
-Globe. *No SMS works until this is done, and OTP is the only way to sign in —
-so nobody but the owner can use the app.*
+Globe. *No SMS works until this is done.*
+
+Since 30 August 2026 this is no longer a total lockout: password sign-in exists
+(§3), so anyone whose account already has a password can use the app now. What
+is still blocked is **self-registration** — a new customer needs one code to
+verify their number, so until this clears, new customers must be created at the
+counter with the admin API.
+
+**1b. Password strength is not enforced yet.** Turn on leaked-password
+protection and a minimum length in the Supabase dashboard, under
+Authentication → Policies. `src/lib/password.ts` checks length and rejects the
+phone number, but only the dashboard setting stops a known-breached password.
+This matters more now that a password alone opens an account that can hold
+bookings.
 
 Why the switch: PhilSMS delivered to Globe (0995, 0950) and silently not at all
 to Smart/TNT (0963, 0947), while charging for every message. Four people
@@ -431,7 +473,8 @@ physical phone.
 ## 8. Screens
 
 **Customer:** `/` slot grid · `/book` confirm · `/pay/[id]` online payment ·
-`/my` bookings · `/sign-in` · `/offline`
+`/my` bookings · `/account` set a password · `/sign-in` (add `?mode=password`
+for the password form) · `/offline`
 
 **Operator** (`profiles.role = 'operator'`, no link from the customer app —
 type `/admin`): `/admin` today · `/admin/payments` review queue ·

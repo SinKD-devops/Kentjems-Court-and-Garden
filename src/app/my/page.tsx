@@ -74,6 +74,13 @@ export default async function MyBookingsPage() {
 
         {done.length > 0 && <Section title="Past">{done.map(Row)}</Section>}
 
+        <Link
+          href="/account"
+          className="rounded-2xl border border-line bg-surface px-4 py-3 text-center text-[13px] font-bold"
+        >
+          Set or change your password
+        </Link>
+
         <form action={signOut} className="pt-2">
           <button type="submit" className="w-full py-2 text-[13px] font-semibold text-soft">
             Sign out

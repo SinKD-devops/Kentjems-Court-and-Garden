@@ -34,6 +34,8 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   const params = await searchParams;
   const phone = typeof params.phone === "string" ? params.phone : undefined;
   const next = typeof params.next === "string" ? params.next : "/";
+  const mode = typeof params.mode === "string" ? params.mode : undefined;
+  const password = !phone && mode === "password";
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
@@ -47,12 +49,14 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
         <p className="text-[11px] font-medium text-soft">
           {phone
             ? `Sent to ${formatPhPhone(phone)}`
-            : "We text you a code. No password to remember."}
+            : password
+              ? "For accounts that have set one."
+              : "We text you a code. No password to remember."}
         </p>
       </header>
 
       <main className="flex flex-1 flex-col gap-4 px-4 pt-4">
-        <AuthForm phone={phone} next={next} />
+        <AuthForm phone={phone} next={next} mode={mode} />
       </main>
     </div>
   );
