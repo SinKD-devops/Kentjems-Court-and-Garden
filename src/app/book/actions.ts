@@ -26,6 +26,11 @@ export async function createRequest(
 
   const name = String(form.get("name") ?? "").trim();
 
+  // Passed through as typed. Whether a purpose is allowed — and the polite
+  // refusal for the two that are not — is decided by request_booking, not
+  // here; a second copy of that rule would be a second thing to keep in step.
+  const purpose = String(form.get("purpose") ?? "").trim() || null;
+
   const supabase = await createSupabaseServer();
   const {
     data: { user },
@@ -54,6 +59,7 @@ export async function createRequest(
     p_starts_at: startsAt,
     p_accept_terms: acceptTerms,
     p_hours: hours,
+    p_purpose: purpose,
   });
 
   if (error) {

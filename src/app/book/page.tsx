@@ -114,6 +114,9 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
               hours={hours}
               needsTerms={!profile?.accepted_terms_at}
               needsName={!profile?.full_name}
+              // Court only. The garden is booked for events, not sports, so
+              // the list would be nonsense there.
+              needsPurpose={spaceSlug === "court"}
               contested={contested}
             />
           </>

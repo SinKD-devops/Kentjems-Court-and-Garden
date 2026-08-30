@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { type RequestState, createRequest } from "@/app/book/actions";
+import { COURT_PURPOSES } from "@/lib/purposes";
 
 const initial: RequestState = {};
 
@@ -11,6 +12,7 @@ export function ConfirmForm({
   hours,
   needsName,
   needsTerms,
+  needsPurpose,
   contested,
 }: {
   space: string;
@@ -18,6 +20,7 @@ export function ConfirmForm({
   hours: number;
   needsName: boolean;
   needsTerms: boolean;
+  needsPurpose: boolean;
   contested: number;
 }) {
   const [state, action, pending] = useActionState(createRequest, initial);
@@ -41,6 +44,30 @@ export function ConfirmForm({
             className="rounded-xl border border-line bg-surface px-3.5 py-3 text-[16px] font-semibold outline-none focus:border-green focus:ring-3 focus:ring-green/15"
           />
         </label>
+      )}
+
+      {needsPurpose && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-faint">
+            What is the court for?
+          </span>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {COURT_PURPOSES.map((purpose) => (
+              <label key={purpose.value} className="flex-none cursor-pointer">
+                <input
+                  type="radio"
+                  name="purpose"
+                  value={purpose.value}
+                  required
+                  className="peer sr-only"
+                />
+                <span className="block rounded-xl border border-line bg-surface px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap peer-checked:border-green peer-checked:bg-green peer-checked:text-white peer-focus-visible:ring-3 peer-focus-visible:ring-green/25">
+                  {purpose.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
       )}
 
       {contested > 0 && (

@@ -170,6 +170,33 @@ Gone with it: `web-push`, the VAPID variables, `push_subscriptions`,
 service worker's push handlers. `public/sw.js` still caches the app shell and
 the offline page — that is unrelated and stays.
 
+### The court asks what it is for, and declines two answers
+
+A booking for the **court** must pick a purpose: pickleball, badminton,
+volleyball, cheerdance, practice or basketball. Cheerdance and practice are
+declined with a polite message carrying the support numbers, read from
+`settings.support_numbers` rather than hardcoded. The garden does not ask —
+it is booked for events, not sports.
+
+Both declined options are **deliberately still shown**. Hiding them leaves
+someone who wants the court for cheerdance guessing why their activity is
+missing; offering them means a real answer and a number to call. Do not
+"optimise" this by removing them from the list or greying them out.
+
+The check is in `request_booking`, not TypeScript — same transaction as the
+insert, same rule as everything else in §9. `src/lib/purposes.ts` carries the
+labels only; if it and the database disagree, the database wins and the
+customer sees "Please choose what the court is for."
+
+Stored in `bookings.event_type`, which had sat unused since the initial schema,
+and surfaced in the counter console and the booking detail screen through
+`operator_schedule.purpose`.
+
+**A refusal leaves no trace.** The exception rolls the transaction back, so
+there is no record of how many people asked for cheerdance or practice. If that
+demand is worth knowing, it needs a separate log table — the current design
+cannot tell you.
+
 ### Payment screenshots are compressed in the browser
 
 `compressImage()` in `src/lib/image.ts` re-encodes a proof to a 1600px JPEG

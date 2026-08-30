@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookingActions } from "@/components/BookingActions";
 import { getDayAvailability, listSpaces } from "@/lib/availability";
+import { purposeLabel } from "@/lib/purposes";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { formatLongDate, formatPeso, formatTime, todayKey } from "@/lib/time";
 
@@ -88,6 +89,7 @@ export default async function BookingDetailPage({
           <p className="mt-1 text-[12.5px] font-medium text-soft">
             {booking.contact_name || "No name"} · {booking.contact_phone}
             {booking.source === "walk_in" && " · walk-in"}
+            {purposeLabel(booking.event_type) ? ` · ${purposeLabel(booking.event_type)}` : ""}
           </p>
           <p className="mt-1.5 inline-block rounded-full bg-sunken px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[0.04em] text-soft">
             {booking.status.replace(/_/g, " ")}

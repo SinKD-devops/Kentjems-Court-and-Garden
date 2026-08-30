@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { confirmCashPayment } from "@/app/admin/payments/actions";
 import { AdminNav } from "@/components/AdminNav";
 import { CloseToday } from "@/components/CloseToday";
+import { purposeLabel } from "@/lib/purposes";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import {
   endOfDay,
@@ -28,6 +29,7 @@ interface ScheduleRow {
   contact_name: string | null;
   contact_phone: string | null;
   expires_at: string | null;
+  purpose: string | null;
   paid: boolean;
 }
 
@@ -167,6 +169,9 @@ export default async function TodayPage({ searchParams }: PageProps<"/admin">) {
                   </div>
                   <p className="text-[13px] font-semibold tabular-nums">
                     {row.space_name} · {formatTime(row.starts_at)} – {formatTime(row.ends_at)}
+                    {purposeLabel(row.purpose) && (
+                      <span className="font-semibold text-soft"> · {purposeLabel(row.purpose)}</span>
+                    )}
                   </p>
                   <form action={confirmCashPayment}>
                     <input type="hidden" name="bookingId" value={row.id} />
