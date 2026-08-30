@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { clearCustomerPassword } from "@/app/admin/customers/actions";
 import { AdminNav } from "@/components/AdminNav";
 import { LiveAvailability } from "@/components/LiveAvailability";
 import { createSupabaseServer } from "@/lib/supabase/server";
@@ -57,6 +58,17 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
 
   const rows = results ?? [];
 
+  // Looked up separately from the bookings above, because the person who
+  // cannot sign in may never have managed to book anything — which is exactly
+  // why they are at the counter.
+  const { data: people } = query
+    ? await supabase
+        .from("profiles")
+        .select("id, phone, full_name, role, password_set_at")
+        .or(`full_name.ilike.%${query}%,phone.ilike.%${digits(query)}%`)
+        .limit(5)
+    : { data: null };
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <LiveAvailability />
@@ -91,9 +103,57 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
           </p>
         )}
 
+        {(people ?? []).length > 0 && (
+          <>
+            <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">
+              Sign-in
+            </p>
+            <ul className="flex flex-col gap-1.5">
+              {(people ?? []).map((person) => (
+                <li
+                  key={person.id}
+                  className="rounded-2xl border border-line bg-surface px-4 py-3"
+                >
+                  <p className="text-[13.5px] font-bold">
+                    {person.full_name || "No name"}
+                    {person.role === "operator" && (
+                      <span className="ml-1.5 text-[10px] font-bold uppercase tracking-[0.06em] text-green">
+                        operator
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[12px] font-medium tabular-nums text-soft">
+                    {person.phone} ·{" "}
+                    {person.password_set_at ? "has a password" : "no password set"}
+                  </p>
+
+                  {person.password_set_at && (
+                    <form action={clearCustomerPassword} className="mt-2.5">
+                      <input type="hidden" name="profileId" value={person.id} />
+                      <input type="hidden" name="q" value={query} />
+                      <button
+                        type="submit"
+                        className="w-full rounded-xl border border-line bg-sunken py-2.5 text-[13px] font-bold text-red"
+                      >
+                        Clear password
+                      </button>
+                    </form>
+                  )}
+
+                  <p className="mt-2 text-[11px] leading-relaxed text-soft">
+                    {person.password_set_at
+                      ? "Clearing it signs them out everywhere. They then sign in with a code and choose a new one."
+                      : "They will be asked to choose a password the next time they sign in."}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
         {query && rows.length === 0 && (
           <p className="rounded-2xl border border-line bg-surface px-4 py-6 text-center text-[13px] text-soft">
-            Nothing found for &ldquo;{query}&rdquo;.
+            No bookings found for &ldquo;{query}&rdquo;.
           </p>
         )}
 

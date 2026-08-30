@@ -204,6 +204,23 @@ Three things it buys, not one:
   PHP 525–700 estimate, and it grows with the customer base rather than with
   occupancy.
 
+**Recovery has two paths.** *"Forgotten your password?"* on the password screen
+is the ordinary code sign-in pointed at `/account` — not a separate flow, so
+there is no second recovery route to keep correct. Changing a password ends
+every other session, since changing it because someone else has it achieves
+nothing if their session simply carries on.
+
+For the person at the counter, `/admin/customers` searches **profiles as well
+as bookings** — the one who cannot sign in may never have managed to book
+anything — and offers **Clear password**. That signs them out everywhere, wipes
+`password_set_at`, and sends them back through the required-password screen
+after their next code sign-in.
+
+Clearing does not help during an SMS outage, because the code will not arrive
+either. That is not the hole it looks like: during an outage the customer is
+standing in front of an operator who can take the booking as a walk-in. The
+reset restores app access; the counter handles the court.
+
 **Recovery is the counter, not an email.** Forgotten password → sign in with a
 code and set a new one at `/account`. If texts are not arriving at all, that
 route is closed too, so the operator resets it with the admin API — verified
@@ -332,6 +349,13 @@ rejected for an unreadable screenshot could never resubmit a genuine payment.
 **The privilege guard blocks operator bootstrap.** `guard_profile_privileges`
 allows `postgres`/`service_role` through precisely so the first operator can be
 created; a customer session is never either.
+
+**`updateUserById({ password: null })` succeeds and does nothing.** Supabase
+accepts it, returns no error, and the old password keeps working — verified
+30 August 2026. There is no "remove a password" call. Clearing one means
+overwriting it with a value nobody has seen and nobody stores, which is what
+`clearCustomerPassword` does. Anyone tidying that into the null form because it
+reads better will silently stop locking anybody out.
 
 **`is_backup_admin` looks like a privilege and is not one.** The column is
 guarded by `guard_profile_privileges` as though it grants operator rights, and
