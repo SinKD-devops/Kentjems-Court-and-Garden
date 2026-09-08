@@ -179,14 +179,15 @@ The channel table as built, after web push was removed on 29 August 2026:
 | Request superseded (lost slot)   | SMS               |
 | Booking moved by operator        | SMS               |
 | Request expiring (T-10 min)      | none — dropped    |
-| Refund approved                  | none — never built |
+| Refund approved                  | SMS               |
 
 The push half of the "SMS + push" rows was never wired; those events always
 went out by SMS alone. Only the expiry reminder ever sent a push, and it was
 dropped rather than converted to SMS — at roughly a third of message volume it
 was the most expensive notification here and the only one not tied to a
-payment. "Refund approved" was specified push-only and never implemented, so
-its removal changed nothing. See HANDOVER §3.
+payment. "Refund approved" was specified push-only, but is in fact sent by SMS
+from the refund action — an earlier note here claimed it was never built, which
+was wrong. See HANDOVER §3.
 
 The original reasoning below still holds and is why SMS carries everything
 that matters:

@@ -32,6 +32,16 @@ const messages: Record<string, string> = {
   superseded: smsCopy.superseded(SPACE, WHEN),
   moved: smsCopy.moved(SPACE, WHEN, OTHER),
   proofToReview: smsCopy.proofToReview(SPACE, WHEN, smsPesos(35000), REFERENCE),
+  // The reason is operator-typed, so the worst case is not a realistic reason
+  // but an unbounded one. This message was billed as two parts for every
+  // refund until 30 August 2026 because it lived outside smsCopy and so was
+  // never measured here.
+  refundApproved: smsCopy.refundApproved(
+    WHEN,
+    "heavy rain through the evening and then a power interruption across the whole barangay",
+    smsPesos(35000),
+    SUPPORT,
+  ),
 };
 
 describe("SMS copy", () => {

@@ -209,4 +209,33 @@ export const smsCopy = {
    */
   proofToReview: (space: string, when: string, price: string, reference: string) =>
     `Kentjems Court and Garden. Payment to check: ${space} ${when}, ${price}, ref ${reference}. Held until you approve.`,
+
+  /**
+   * Written inline at the refund action until 30 August 2026, which kept it
+   * out of `smsCopy` and therefore out of the test that checks every message
+   * fits one part. It never did: the shortest plausible reason, "rain", came
+   * to 167 characters, so every refund had been billed twice.
+   *
+   * The reason is operator-typed free text, so shortening the wording alone
+   * would only move the cliff rather than remove it. The reason is given a
+   * budget instead and trimmed to fit, which makes a second part impossible
+   * rather than unlikely. Trimming is on a word boundary with nothing
+   * appended — an ellipsis is not in the GSM alphabet, and `gsmSafe` would
+   * expand it to three more characters after the length was decided.
+   */
+  refundApproved: (when: string, reason: string, amount: string, support: string) => {
+    // Wording kept lean so the reason survives rather than the padding: every
+    // word here is a word of "a power interruption" that gets truncated away.
+    const head = `Kentjems Court and Garden. Your ${when} booking is cancelled`;
+    const tail = `. Collect ${amount} refund at Kentjems Store. Call ${support}.`;
+    const room = 160 - head.length - tail.length - " ()".length;
+
+    const reasonText = reason.trim();
+    let fitted = reasonText.length <= room ? reasonText : reasonText.slice(0, Math.max(0, room));
+    if (fitted.length < reasonText.length) {
+      fitted = fitted.slice(0, Math.max(0, fitted.lastIndexOf(" "))).trimEnd() || fitted.trimEnd();
+    }
+
+    return fitted ? `${head} (${fitted})${tail}` : `${head}${tail}`;
+  },
 };

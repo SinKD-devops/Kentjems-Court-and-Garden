@@ -94,9 +94,12 @@ export async function refundBooking(
   if (result.phone) {
     const sent = await sendSms(
       result.phone,
-      `Kentjems Court and Garden. Your booking on ${describe(result.starts_at, result.ends_at)} ` +
-        `is cancelled because of ${reason}. Please collect your ` +
-        `${smsPesos(result.amount_centavos)} refund at Kentjems Store, or call ${support}.`,
+      smsCopy.refundApproved(
+        describe(result.starts_at, result.ends_at),
+        reason,
+        smsPesos(result.amount_centavos),
+        support,
+      ),
       "refund-approved",
     );
     if (!sent.ok) console.error("Refund SMS failed:", sent.error);
