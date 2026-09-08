@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PasswordForm } from "@/components/PasswordForm";
 import { formatPhPhone } from "@/lib/phone";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { createSupabaseServer, getCurrentUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,14 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
   const params = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in?next=%2Faccount");
+
+  // Read with the caller's own session — RLS keeps profiles to their owner.
+  const session = await createSupabaseServer();
+  const { data: profile } = await session
+    .from("profiles")
+    .select("password_set_at")
+    .eq("id", user.id)
+    .maybeSingle();
 
   // Shown straight after a first code sign-in, before the customer has gone
   // anywhere else.
@@ -39,7 +47,7 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
             : "Setting a password lets you sign in straight away instead of waiting for a text. Codes keep working — this is an extra way in, not a replacement."}
         </p>
 
-        <PasswordForm next={first ? next : undefined} />
+        <PasswordForm next={first ? next : undefined} needsCurrent={!!profile?.password_set_at} />
 
         <p className="px-1 text-[11.5px] leading-relaxed text-soft">
           {first

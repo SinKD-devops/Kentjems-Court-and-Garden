@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
 /**
@@ -69,5 +70,9 @@ export async function clearCustomerPassword(form: FormData) {
   // would leave whoever is using that device signed in regardless.
   await admin.auth.admin.signOut(profileId, "global").catch(() => {});
 
-  revalidatePath(`/admin/customers?q=${encodeURIComponent(query)}`);
+  // Confirmed back on the page rather than left to a silent re-render. The
+  // operator is telling a customer to their face that their password is gone;
+  // they need to see that it happened before they say so.
+  revalidatePath("/admin/customers");
+  redirect(`/admin/customers?q=${encodeURIComponent(query)}&cleared=1`);
 }

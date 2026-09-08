@@ -47,7 +47,7 @@ export function PayForm({
 
       let proofPath: string | null = null;
       if (file) {
-        const { blob, extension } = await compressImage(file);
+        const { blob } = await compressImage(file);
 
         // Checked here so an oversized proof fails with something a customer
         // can act on, rather than an opaque storage error after the upload.
@@ -57,7 +57,13 @@ export function PayForm({
           );
         }
 
-        proofPath = `${user.id}/${bookingId}.${extension}`;
+        // No extension in the path, deliberately. It used to carry the source
+        // file's, so a customer who first sent a .heic and then a compressed
+        // .jpg wrote to two different objects: the upsert replaced neither and
+        // the first was orphaned in the bucket until the 90-day purge. One
+        // booking is one object. The operator's view fetches a signed URL and
+        // renders from the stored content type, which does not need the suffix.
+        proofPath = `${user.id}/${bookingId}`;
         const { error: uploadError } = await supabase.storage
           .from("payment-proofs")
           .upload(proofPath, blob, { upsert: true, contentType: blob.type });

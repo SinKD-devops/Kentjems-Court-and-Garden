@@ -6,7 +6,13 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/password";
 
 const initial: PasswordState = {};
 
-export function PasswordForm({ next }: { next?: string }) {
+export function PasswordForm({
+  next,
+  needsCurrent,
+}: {
+  next?: string;
+  needsCurrent?: boolean;
+}) {
   const [state, action, pending] = useActionState(setPassword, initial);
 
   if (state.done) {
@@ -21,6 +27,21 @@ export function PasswordForm({ next }: { next?: string }) {
   return (
     <form action={action} className="flex flex-col gap-3">
       {next && <input type="hidden" name="next" value={next} />}
+
+      {needsCurrent && (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-faint">
+            Current password
+          </span>
+          <input
+            name="current"
+            type="password"
+            autoComplete="current-password"
+            required
+            className="rounded-xl border border-line bg-surface px-3.5 py-3 text-[16px] font-semibold outline-none focus:border-green focus:ring-3 focus:ring-green/15"
+          />
+        </label>
+      )}
 
       <label className="flex flex-col gap-1.5">
         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-faint">

@@ -106,6 +106,16 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
           </p>
         )}
 
+        {params.cleared === "1" && (
+          <p
+            role="status"
+            className="rounded-2xl bg-tint px-4 py-3 text-[13px] font-semibold text-green-deep"
+          >
+            Password cleared. They are signed out everywhere and will choose a new
+            one after their next code sign-in.
+          </p>
+        )}
+
         {(people ?? []).length > 0 && (
           <>
             <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-faint">

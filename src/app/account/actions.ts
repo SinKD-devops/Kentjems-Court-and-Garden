@@ -10,6 +10,38 @@ export interface PasswordState {
 }
 
 /**
+ * Was this session opened with a password, or with a texted code?
+ *
+ * It decides whether the current password has to be given before setting a new
+ * one. Asking is right for a password session — otherwise an unlocked phone
+ * left on a counter is enough to take the account, and since a password now
+ * gates booking, taking it locks the real owner out.
+ *
+ * Asking is wrong for a code session. That is the recovery path: someone who
+ * has forgotten their password signs in with a code, and demanding the
+ * forgotten password at that point would make recovery impossible. The code
+ * already proved they hold the number, which is the same thing the password
+ * would have proved.
+ *
+ * `getClaims()` verifies the JWT rather than decoding it, so a tampered cookie
+ * claiming `otp` does not get a free pass.
+ */
+async function signedInWithPassword(
+  supabase: Awaited<ReturnType<typeof createSupabaseServer>>,
+): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getClaims();
+    const amr = (data?.claims as { amr?: { method?: string }[] } | undefined)?.amr;
+    if (!Array.isArray(amr) || amr.length === 0) return true;
+    return amr.some((entry) => entry?.method === "password");
+  } catch {
+    // Unreadable claims fall back to asking. The safe direction is the one
+    // that demands more proof, not less.
+    return true;
+  }
+}
+
+/**
  * Sets or replaces the signed-in customer's password.
  *
  * Requires a live session, which is the whole security model here: the only
@@ -39,6 +71,39 @@ export async function setPassword(
 
   const complaint = checkPassword(password, user.phone);
   if (complaint) return { error: complaint };
+
+  // Someone who already has a password must prove they know it. A live session
+  // is otherwise enough to change it, so an unlocked phone left on a counter
+  // is enough to take the account — and now that a password gates booking,
+  // taking it locks the real owner out rather than merely inconveniencing them.
+  //
+  // Only asked of people who have one. The first-run screen would otherwise
+  // demand a password nobody has yet.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("password_set_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profile?.password_set_at && (await signedInWithPassword(supabase))) {
+    const current = String(form.get("current") ?? "");
+    if (!current) return { error: "Please enter your current password." };
+
+    // Verified on a throwaway client. Signing in on the request's own client
+    // would rewrite the session cookie as a side effect of a check.
+    const { createClient } = await import("@supabase/supabase-js");
+    const probe = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+
+    const { error: wrong } = await probe.auth.signInWithPassword({
+      phone: `+${user.phone}`,
+      password: current,
+    });
+    if (wrong) return { error: "That is not your current password." };
+  }
 
   const { error } = await supabase.auth.updateUser({ password });
   if (error) return { error: error.message };

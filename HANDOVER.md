@@ -57,7 +57,13 @@ selection, cash at the counter, walk-ins, online payment with operator review,
 move, refund, reports, settings, realtime updates, weather, the counter
 console, and the PWA manifest and icons.
 
-**48 tests pass.** `npm test`.
+**48 tests pass.** `npm test`, about 50 seconds.
+
+The suite is **not perfectly reliable**: on 30 August one run in five failed
+26 tests with a suite-level error and gave up in 33 seconds, then passed four
+times either side of it with no code change. It runs against the live Seoul
+database, so a dropped connection takes a lot of tests with it. Re-run before
+believing a failure — and do not let that habit hide a real one.
 
 **SMS:** sender name approved and in Vault since 30 August 2026, so sign-in
 codes should send. **Delivery is not yet verified on a real handset** — see §7.
@@ -206,6 +212,25 @@ Three things it buys, not one:
   PHP 525–700 estimate, and it grows with the customer base rather than with
   occupancy.
 
+**Changing a password asks for the current one — unless the session came from a
+code.** A live session alone used to be enough, so an unlocked phone left on a
+counter could take the account, and since a password now gates booking that
+locks the real owner out rather than merely inconveniencing them.
+
+The exception is what makes recovery possible at all: someone who has forgotten
+their password signs in with a code, and demanding the forgotten password there
+would be a closed loop. The session's `amr` claim says which method opened it,
+read through `getClaims()` so a tampered cookie claiming `otp` gets nothing.
+Unreadable claims fall back to asking, because the safe direction is the one
+that demands more proof.
+
+**Password guessing is throttled per phone number**, not per IP — 8 failures in
+15 minutes, then codes only. Supabase's own limit is per IP and a dashboard
+setting; the attack that matters here is many guesses at one number, because
+the usernames are not secret. `auth_attempts` is written only with the service
+key and has RLS on with **no policies at all**, so a customer can neither read
+it nor clear their own count.
+
 **Recovery has two paths.** *"Forgotten your password?"* on the password screen
 is the ordinary code sign-in pointed at `/account` — not a separate flow, so
 there is no second recovery route to keep correct. Changing a password ends
@@ -352,6 +377,16 @@ rejected for an unreadable screenshot could never resubmit a genuine payment.
 allows `postgres`/`service_role` through precisely so the first operator can be
 created; a customer session is never either.
 
+**An upsert to Storage is an UPDATE, and needs its own policy.** The
+`payment-proofs` bucket had INSERT and SELECT policies only, while `PayForm`
+uploads with `upsert: true`. The first write to a path was an INSERT and
+worked; every later one became an UPDATE and was refused — so the customer saw
+*"new row violates row-level security policy"* **and** their image sitting
+there, which is a confusing pair to debug. Worse, a customer told to resend a
+clearer screenshot could not, and had a genuine payment rejected. Fixed by the
+`own proof replace` policy; both USING and WITH CHECK are set, or a row could
+be updated into someone else's folder.
+
 **`updateUserById({ password: null })` succeeds and does nothing.** Supabase
 accepts it, returns no error, and the old password keeps working — verified
 30 August 2026. There is no "remove a password" call. Clearing one means
@@ -393,7 +428,7 @@ prevent.
 ### Tables
 `spaces`, `profiles`, `bookings`, `payments`, `refunds`, `booking_moves`,
 `opening_hours`, `pricing_rules`, `closures`, `packages` (retired),
-`settings` (singleton), `availability_pulse`, `sms_log`,
+`settings` (singleton), `availability_pulse`, `sms_log`, `auth_attempts`,
 `schema_migrations`
 
 ### Booking statuses
@@ -436,6 +471,7 @@ contested slot silently means walking to the store for a court that is gone.
 | `complete-past-bookings` | every 15 min | confirmed → completed |
 | `purge-proofs` | 03:15 Manila | calls `/api/cron/purge-proofs`, 90-day retention |
 | `sms-balance-check` | 08:00 Manila | calls `/api/cron/sms-balance`, warns below PHP 50 |
+| `purge-auth-attempts` | 03:17 Manila | drops failed password attempts older than 2 days |
 
 The three that call the app go through `pg_net` using `app_url` and
 `cron_secret` from Vault. **If `app_url` is `localhost` they run every minute

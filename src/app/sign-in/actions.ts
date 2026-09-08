@@ -8,6 +8,13 @@ export interface AuthState {
   error?: string;
 }
 
+/**
+ * Loose enough that a customer mistyping on a phone keyboard never meets it,
+ * tight enough that working through a number's password space is not viable.
+ */
+const MAX_ATTEMPTS = 8;
+const ATTEMPT_WINDOW_MINUTES = 15;
+
 export async function sendCode(_prev: AuthState, form: FormData): Promise<AuthState> {
   const phone = normalizePhPhone(String(form.get("phone") ?? ""));
   const next = String(form.get("next") ?? "/");
@@ -96,8 +103,38 @@ export async function signInWithPassword(
     return { error: "Please enter your password." };
   }
 
+  // Throttled per phone number rather than per IP. The usernames are not
+  // secret — every PH mobile is `09` plus nine digits — so the attack that
+  // matters is many guesses at one number, which an IP limit does not see if
+  // the guesser moves around.
+  const { createClient } = await import("@supabase/supabase-js");
+  const service = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+
+  const { data: recent } = await service.rpc("password_attempts_recent", {
+    p_phone: phone,
+    p_minutes: ATTEMPT_WINDOW_MINUTES,
+  });
+
+  if ((recent ?? 0) >= MAX_ATTEMPTS) {
+    return {
+      error: `Too many tries. Wait ${ATTEMPT_WINDOW_MINUTES} minutes, or sign in with a code instead.`,
+    };
+  }
+
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase.auth.signInWithPassword({ phone, password });
+
+  if (error) {
+    await service.rpc("record_password_failure", { p_phone: phone });
+  } else {
+    // Cleared on success so an honest customer who mistyped a few times is not
+    // still counting down afterwards.
+    await service.rpc("clear_password_failures", { p_phone: phone });
+  }
 
   if (!error && data.user) {
     // Signing in this way is proof a password exists, whatever the column
