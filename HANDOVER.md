@@ -59,7 +59,9 @@ console, and the PWA manifest and icons.
 
 **48 tests pass.** `npm test`.
 
-**Blocked:** all SMS. See §7.
+**SMS:** sender name approved and in Vault since 30 August 2026, so sign-in
+codes should send. **Delivery is not yet verified on a real handset** — see §7.
+Transactional messages also need the variable on Vercel and a redeploy.
 
 **Never tested:** payment screenshot upload (needs a real file picker) and PWA
 home-screen install. Both need a physical phone.
@@ -469,18 +471,27 @@ the database functions) matches.
 
 ## 7. Blockers, in priority order
 
-**1. Semaphore has no approved sender name.** Every send is refused with
-*"No active sender name found."* Tried omitting it, `SEMAPHORE`, `Kentjems` —
-all rejected. The owner was applying for one. When approved: put it in
-`.env.local` as `SEMAPHORE_SENDER_NAME`, run `npm run db:secrets`, add it to
-Vercel, then test delivery to a **Smart/TNT** number (09635483047), not just
-Globe. *No SMS works until this is done.*
+**1. Semaphore sender name — RESOLVED 30 August 2026.** The approved name is
+**`Kentjems`**, active on the account since 28 August 10:55 pm. The earlier note
+here recorded `Kentjems` as rejected; it was, before approval came through, so
+do not read that as the name being unusable.
 
-Since 30 August 2026 this is no longer a total lockout: password sign-in exists
-(§3), so anyone whose account already has a password can use the app now. What
-is still blocked is **self-registration** — a new customer needs one code to
-verify their number, so until this clears, new customers must be created at the
-counter with the admin API.
+Confirmed straight from the provider rather than from memory —
+`GET /api/v4/account/sendernames` with `SEMAPHORE_API_KEY` lists approved names,
+and `GET /api/v4/account` gives the balance. Account `Kentjems`, status Active,
+**1,010 credits**. Use those two endpoints before debugging anything about
+sending; they answer "is the account able to send at all" in one call.
+
+Done: `SEMAPHORE_SENDER_NAME=Kentjems` in `.env.local`, and `npm run db:secrets`
+has pushed it to Vault. The OTP hook is a Postgres function reading Vault, so
+**sign-in SMS needs no deploy** and should work as soon as the secret lands.
+
+Still outstanding: the same variable on **Vercel**, plus a redeploy, for the
+transactional messages the app sends (approved, rejected, superseded, moved) —
+those read `process.env`, not Vault. And **delivery is unverified**: §4's first
+trap is that a provider reporting success proves nothing. Test a real code to a
+**Smart/TNT** number (09635483047), not just Globe, because Smart/TNT is exactly
+what PhilSMS silently failed while charging for it.
 
 **1b. Password strength is not enforced yet.** Turn on leaked-password
 protection and a minimum length in the Supabase dashboard, under
