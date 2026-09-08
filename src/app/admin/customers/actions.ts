@@ -24,6 +24,7 @@ export async function clearCustomerPassword(form: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return;
+  if (!profileId) return;
 
   // Re-checked here with the caller's own session. The page also checks, but a
   // server action is an endpoint anyone can post to — a guard that lives only
@@ -51,7 +52,14 @@ export async function clearCustomerPassword(form: FormData) {
   const { error } = await admin.auth.admin.updateUserById(profileId, {
     password: unusable,
   });
-  if (error) return;
+
+  // Logged rather than swallowed. This is a security action: if it fails, the
+  // operator has told a customer their password is gone while it still works,
+  // and a silent return leaves nothing behind to find out from.
+  if (error) {
+    console.error(`Clearing password for ${profileId} failed: ${error.message}`);
+    return;
+  }
 
   // Sends them back through the required-password screen after their next code
   // sign-in, so they leave with a password rather than without one.

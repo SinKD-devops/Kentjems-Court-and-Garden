@@ -45,13 +45,16 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
 
   const query = typeof params.q === "string" ? params.q.trim() : "";
 
-  const { data: results } = query
+  // Digits typed as 0917… still find a number stored as 63917…, so the search
+  // works from whatever the operator has in front of them.
+  const bookingFilter = query ? searchFilter("contact_name", "contact_phone", query) : null;
+  const peopleFilter = query ? searchFilter("full_name", "phone", query) : null;
+
+  const { data: results } = bookingFilter
     ? await supabase
         .from("bookings")
         .select("id, starts_at, ends_at, status, price_centavos, source, contact_name, contact_phone, spaces(name)")
-        // Digits typed as 0917… still find a number stored as 63917…, so the
-        // search works from whatever the operator has in front of them.
-        .or(`contact_name.ilike.%${query}%,contact_phone.ilike.%${digits(query)}%`)
+        .or(bookingFilter)
         .order("starts_at", { ascending: false })
         .limit(50)
     : { data: null };
@@ -61,11 +64,11 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
   // Looked up separately from the bookings above, because the person who
   // cannot sign in may never have managed to book anything — which is exactly
   // why they are at the counter.
-  const { data: people } = query
+  const { data: people } = peopleFilter
     ? await supabase
         .from("profiles")
         .select("id, phone, full_name, role, password_set_at")
-        .or(`full_name.ilike.%${query}%,phone.ilike.%${digits(query)}%`)
+        .or(peopleFilter)
         .limit(5)
     : { data: null };
 
@@ -220,4 +223,34 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
 /** 0917 123 4567 → 9171234567, which matches however the number was stored. */
 function digits(input: string): string {
   return input.replace(/\D/g, "").replace(/^0/, "").replace(/^63/, "");
+}
+
+/**
+ * Strips the characters PostgREST reads as filter syntax.
+ *
+ * `.or()` takes a string that PostgREST parses, so a comma in a customer's
+ * name ends the clause and starts another: searching "Dela Cruz, Jr" returned
+ * *failed to parse logic tree*, and a crafted value could bolt an extra
+ * condition onto the query. Names are matched, not parsed, so the safe move is
+ * to drop the syntax characters rather than try to quote around them.
+ */
+function safeTerm(input: string): string {
+  return input.replace(/[,().*"\\:]/g, " ").trim();
+}
+
+/**
+ * Builds the search filter, leaving out any clause with nothing to match on.
+ *
+ * A name with no digits in it used to still emit `phone.ilike.%%`, which every
+ * row satisfies — so searching for one person listed every customer instead.
+ */
+function searchFilter(nameColumn: string, phoneColumn: string, query: string): string | null {
+  const term = safeTerm(query);
+  const number = digits(query);
+
+  const clauses: string[] = [];
+  if (term) clauses.push(`${nameColumn}.ilike.%${term}%`);
+  if (number) clauses.push(`${phoneColumn}.ilike.%${number}%`);
+
+  return clauses.length ? clauses.join(",") : null;
 }
